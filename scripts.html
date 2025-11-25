@@ -1,0 +1,510 @@
+<script>
+    // --- COMPONENTS ---
+
+    const GlobalNotification = {
+        template: '#global-notification-template',
+        data() {
+            return {
+                visible: false,
+                title: '',
+                message: '',
+                type: 'success'
+            };
+        },
+        computed: {
+            iconClass() {
+                if (this.type === 'success') return 'fa-check-circle';
+                if (this.type === 'error') return 'fa-times-circle';
+                return 'fa-info-circle';
+            }
+        },
+        methods: {
+            show(message, type = 'success', title) {
+                this.message = message;
+                this.type = type;
+                this.title = title || (type === 'success' ? 'Éxito' : 'Error');
+                this.visible = true;
+            },
+            close() {
+                this.visible = false;
+            }
+        }
+    };
+
+    const TablesView = {
+        template: '#tables-view-template',
+        props: ['tables']
+    };
+
+    const OrdersView = {
+        template: '#orders-view-template',
+        methods: {
+            viewOrder(orderId) {
+                this.$root.showNotification('Vista de orden en construcción.', 'info', 'Información');
+            }
+        }
+    };
+
+    const CashierView = {
+        template: '#cashier-view-template',
+        props: ['session', 'closingSummary', 'cashFlowMovements'],
+        data() {
+            return {
+                form: {
+                    initialAmount: null, countedCash: null, notes: '',
+                    cashFlowAmount: null, cashFlowDescription: ''
+                },
+                activeTab: 'movement',
+                showMovements: false
+            };
+        },
+        methods: {
+            switchTab(tabName) {
+                this.activeTab = tabName;
+                if (tabName === 'close') {
+                    this.$emit('fetch-expected-cash');
+                }
+            },
+            toggleMovements() {
+                this.showMovements = !this.showMovements;
+                if (this.showMovements) {
+                    this.$emit('fetch-movements');
+                }
+            }
+        },
+        watch: {
+            session(newSession) {
+                if (newSession) {
+                    this.activeTab = 'movement';
+                    this.form.initialAmount = null;
+                    this.form.cashFlowAmount = null;
+                    this.form.cashFlowDescription = '';
+                    this.form.countedCash = null;
+                    this.form.notes = '';
+                    this.showMovements = false; // Reset on new session
+                }
+            }
+        }
+    };
+
+    const PosView = {
+        template: '#pos-view-template',
+        props: ['table'],
+        data() {
+            return {
+                showProductModal: false,
+                selectedProduct: null,
+                selectedModifiers: {},
+                cart: [],
+                selectedCategory: null
+            };
+        },
+        computed: {
+            root() { return this.$root; },
+            categories() {
+                const allCategories = this.root.products.map(p => p.category);
+                return [...new Set(allCategories)];
+            },
+            filteredProducts() {
+                if (!this.selectedCategory) return [];
+                return this.root.products.filter(p => p.category === this.selectedCategory);
+            },
+            availableModifiers() {
+                if (!this.selectedProduct || !this.selectedProduct.applicable_modifier_groups) return {};
+                const allowedGroups = this.selectedProduct.applicable_modifier_groups.split(',').map(g => g.trim());
+                if (allowedGroups.length === 0) return {};
+                const groups = {};
+                this.root.modifiers.forEach(m => {
+                    if (allowedGroups.includes(m.group_name)) {
+                        if (!groups[m.group_name]) {
+                            groups[m.group_name] = {
+                                items: [],
+                                selection_mode: m.selection_mode,
+                                selection_limit: Number(m.selection_limit || 0)
+                            };
+                        }
+                        groups[m.group_name].items.push(m);
+                    }
+                });
+                return groups;
+            },
+            cartTotal() {
+                return this.cart.reduce((sum, item) => sum + (item.final_price * item.quantity), 0);
+            },
+            isConfirmDisabled() {
+                for (const name in this.availableModifiers) {
+                    const group = this.availableModifiers[name];
+                    if (group.selection_mode === 'multiple_limited') {
+                        const selection = this.selectedModifiers[name];
+                        if (!selection || selection.length !== group.selection_limit) return true;
+                    }
+                }
+                return false;
+            }
+        },
+        methods: {
+            selectCategory(category) { this.selectedCategory = category; },
+            selectProduct(product) {
+                const hasModifiers = product.applicable_modifier_groups && product.applicable_modifier_groups.length > 0;
+                if (!hasModifiers) {
+                    this.addItemToCart({
+                        product_id: product.id, product_name: product.name, modifiers_detail: '', modifier_ids: '',
+                        quantity: 1, original_price: product.base_price, final_price: product.base_price, notes: ''
+                    });
+                } else {
+                    this.selectedProduct = product;
+                    this.selectedModifiers = {};
+                    this.$nextTick(() => {
+                        for (const name in this.availableModifiers) {
+                            const group = this.availableModifiers[name];
+                            if (group.selection_mode !== 'single') {
+                                this.$set(this.selectedModifiers, name, []);
+                            }
+                        }
+                    });
+                    this.showProductModal = true;
+                }
+            },
+            isModifierDisabled(groupName, modifier) {
+                const group = this.availableModifiers[groupName];
+                if (group.selection_mode !== 'multiple_limited') return false;
+                const selection = this.selectedModifiers[groupName];
+                if (!selection) return false;
+                const limit = group.selection_limit;
+                const isSelected = selection.some(m => m.id === modifier.id);
+                return selection.length >= limit && !isSelected;
+            },
+            closeProductModal() {
+                this.showProductModal = false;
+                this.selectedProduct = null;
+                this.selectedModifiers = {};
+            },
+            confirmAdd() {
+                let price = Number(this.selectedProduct.base_price);
+                let modifiersDesc = [];
+                let modifierIds = [];
+                for (const [group, selection] of Object.entries(this.selectedModifiers)) {
+                    if (Array.isArray(selection)) {
+                        selection.forEach(m => {
+                            price += Number(m.price_adjustment);
+                            modifiersDesc.push(m.name);
+                            modifierIds.push(m.id);
+                        });
+                    } else if (selection) {
+                        price += Number(selection.price_adjustment);
+                        modifiersDesc.push(selection.name);
+                        modifierIds.push(selection.id);
+                    }
+                }
+                const item = {
+                    product_id: this.selectedProduct.id, product_name: this.selectedProduct.name,
+                    modifiers_detail: modifiersDesc.sort().join(', '),
+                    modifier_ids: modifierIds.sort().join(','),
+                    quantity: 1, original_price: price, final_price: price, notes: ''
+                };
+                this.addItemToCart(item);
+                this.closeProductModal();
+            },
+            addItemToCart(newItem) {
+                const existingItemIndex = this.cart.findIndex(cartItem =>
+                    cartItem.product_id === newItem.product_id &&
+                    cartItem.modifier_ids === (newItem.modifier_ids || '')
+                );
+                if (existingItemIndex > -1) {
+                    this.cart[existingItemIndex].quantity++;
+                } else {
+                    newItem.item_id = 'ITEM-' + Date.now();
+                    this.cart.push(newItem);
+                }
+            },
+            removeFromCart(index) { this.cart.splice(index, 1); },
+            increaseQuantity(index) { this.cart[index].quantity++; },
+            decreaseQuantity(index) {
+                this.cart[index].quantity--;
+                if (this.cart[index].quantity <= 0) this.removeFromCart(index);
+            },
+            saveOrder() {
+                if (!this.table) return;
+                this.root.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.root.loading = false;
+                        if (res.success) {
+                            this.$root.showNotification('¡Cambios guardados!', 'success');
+                            this.cart.splice(0, this.cart.length, ...res.items); // Force reactivity
+                        } else {
+                            this.$root.showNotification('Error guardando la orden: ' + res.error, 'error');
+                        }
+                    })
+                    .saveOrderItems(this.root.currentOrderId, this.cart);
+            },
+            handleFreeUpTable() {
+                if (this.cart.length > 0) {
+                    this.$root.showNotification('Esta mesa tiene un pedido activo. Por favor, cóbralo o vacía el carrito para poder liberarla.', 'error', 'Acción no permitida');
+                    return;
+                }
+                if (confirm('¿Estás seguro de que quieres liberar esta mesa? Se eliminará la orden vacía.')) {
+                    this.root.loading = true;
+                    google.script.run
+                        .withSuccessHandler(res => {
+                            this.root.loading = false;
+                            if (res.success) {
+                                this.$root.showNotification('Mesa liberada.', 'success');
+                                this.root.setView('tables');
+                            } else {
+                                this.$root.showNotification('Error al liberar la mesa: ' + res.error, 'error');
+                            }
+                        })
+                        .forceFreeUpTable(this.table.table_id, this.root.currentOrderId);
+                }
+            }
+        },
+        mounted() {
+            if (this.categories.length > 0) this.selectCategory(this.categories[0]);
+        },
+        watch: {
+            table: {
+                handler(newTable) {
+                    if (newTable && this.categories.length > 0) this.selectCategory(this.categories[0]);
+                },
+                immediate: true
+            },
+            categories: {
+                handler(newCategories) {
+                    if (this.table && newCategories.length > 0 && (!this.selectedCategory || !newCategories.includes(this.selectedCategory))) {
+                        this.selectCategory(newCategories[0]);
+                    }
+                }
+            }
+        }
+    };
+
+    const EditItemModal = {
+        template: '#edit-item-modal',
+        props: ['item'],
+        data() {
+            return { editForm: { final_price: 0, notes: '' } };
+        },
+        mounted() {
+            this.editForm.final_price = this.item.final_price;
+            this.editForm.notes = this.item.notes;
+        },
+        methods: {
+            saveEdit() { this.$emit('save', this.editForm); }
+        }
+    };
+
+    const PaymentView = {
+        template: '#payment-view-template',
+        props: ['order', 'paymentMethods'],
+        data() { return { paymentLines: [] }; },
+        computed: {
+            totalPaid() { return this.paymentLines.reduce((sum, line) => sum + Number(line.amount || 0), 0); },
+            remainingBalance() { return this.order.cartTotal - this.totalPaid; }
+        },
+        methods: {
+            initPaymentLines() { this.paymentLines = [{ payment_method: 'Efectivo', amount: this.order.cartTotal }]; },
+            addPaymentLine() {
+                const remaining = this.remainingBalance;
+                this.paymentLines.push({ payment_method: '', amount: remaining > 0 ? remaining.toFixed(2) : 0 });
+            },
+            removePaymentLine(index) { this.paymentLines.splice(index, 1); },
+            submit() {
+                if (Math.abs(this.totalPaid - this.order.cartTotal) > 0.01) {
+                    this.$root.showNotification('El monto pagado no coincide con el total de la orden.', 'error');
+                    return;
+                }
+                this.$emit('submit-payment', {
+                    payments: this.paymentLines,
+                    totalAmount: this.order.cartTotal
+                });
+            }
+        },
+        mounted() {
+            if (this.order) this.initPaymentLines();
+        }
+    };
+
+    // --- ROOT VUE INSTANCE ---
+    new Vue({
+        el: '#app',
+        components: {
+            'tables-view': TablesView,
+            'pos-view': PosView,
+            'orders-view': OrdersView,
+            'cashier-view': CashierView,
+            'edit-item-modal': EditItemModal,
+            'payment-view': PaymentView,
+            'global-notification': GlobalNotification
+        },
+        data: {
+            loading: true, currentView: 'tables',
+            products: [], modifiers: [], tables: [], paymentMethods: [],
+            currentTable: null, currentOrderId: null, activeSession: null,
+            showEditModal: false, editingItem: null, editingItemIndex: -1,
+            closingSummary: null,
+            orderToPay: null
+        },
+        methods: {
+            showNotification(message, type, title) {
+                this.$refs.notification.show(message, type, title);
+            },
+            loadData() {
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.products = res.products; this.modifiers = res.modifiers;
+                            this.tables = res.tables; this.activeSession = res.activeSession;
+                            this.paymentMethods = res.paymentMethods;
+                        } else { this.showNotification('Error cargando datos iniciales: ' + res.error, 'error'); }
+                    })
+                    .withFailureHandler(err => {
+                        this.loading = false;
+                        this.showNotification('Error de conexión con el servidor. Por favor, recarga la página. ' + err.message, 'error', 'Error de Conexión');
+                    })
+                    .getInitialData();
+            },
+            // The handleFetchCashFlowMovements method is removed as it's no longer needed
+            // CashierView now directly emits fetch-expected-cash
+            setView(view) {
+                if (this.currentView === 'pos' && view !== 'pos' && view !== 'payment') {
+                    this.currentTable = null; this.currentOrderId = null;
+                }
+                this.currentView = view;
+            },
+            selectTable(table) {
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.currentTable = table; this.currentOrderId = res.orderId;
+                            this.setView('pos');
+                            this.$nextTick(() => {
+                                if (this.$refs.viewComponent) this.$refs.viewComponent.cart = res.items || [];
+                            });
+                        } else { this.showNotification('Error al obtener o crear la orden: ' + res.error, 'error'); }
+                    })
+                    .getOrCreateTableOrder(table.table_id);
+            },
+            goToPaymentView(orderData) {
+                this.orderToPay = orderData;
+                this.setView('payment');
+            },
+            handleFinalizePayment(paymentData) {
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.showNotification('¡Pago registrado y orden cerrada!', 'success');
+                            this.orderToPay = null;
+                            const tableId = this.currentTable.table_id;
+                            const tableIndex = this.tables.findIndex(t => t.table_id === tableId);
+                            if (tableIndex > -1) this.tables[tableIndex].status = 'Available';
+                            this.setView('tables');
+                        } else { this.showNotification('Error procesando el pago: ' + res.error, 'error'); }
+                    })
+                    .finalizeOrderAndPay(this.currentOrderId, paymentData.payments, paymentData.totalAmount);
+            },
+            openEditModal({ item, index }) {
+                this.editingItem = item; this.editingItemIndex = index;
+                this.showEditModal = true;
+            },
+            saveEditItem(formData) {
+                const cart = this.$refs.viewComponent.cart;
+                if (cart && cart[this.editingItemIndex]) {
+                    Object.assign(cart[this.editingItemIndex], formData);
+                }
+                this.showEditModal = false;
+            },
+            fetchExpectedCash() {
+                this.closingSummary = null;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        if (res.success) {
+                            this.closingSummary = res.summary;
+                        } else {
+                            this.showNotification('Error calculando el resumen de caja: ' + res.error, 'error');
+                        }
+                    })
+                    .getExpectedCash();
+            },
+            handleOpenSession(form) {
+                if (form.initialAmount === null || form.initialAmount < 0) {
+                    this.showNotification('Por favor, ingrese un monto inicial válido.', 'error', 'Dato Inválido');
+                    return;
+                }
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.activeSession = res.session;
+                        } else {
+                            this.showNotification('Error abriendo caja: ' + res.error, 'error');
+                        }
+                    })
+                    .startNewCashierSession(form.initialAmount);
+            },
+            handleCloseSession(form) {
+                if (form.countedCash === null || form.countedCash < 0) {
+                    this.showNotification('Por favor, ingrese el monto contado en caja.', 'error', 'Dato Inválido');
+                    return;
+                }
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.activeSession = null;
+                            const report = res.closingReport;
+                            let differenceText = '';
+                            if (report.difference > 0) {
+                                differenceText = `Sobrante: S/.${report.difference.toFixed(2)}`;
+                            } else if (report.difference < 0) {
+                                differenceText = `Faltante: S/.${Math.abs(report.difference).toFixed(2)}`;
+                            } else {
+                                differenceText = 'Cuadre Exacto';
+                            }
+                            this.showNotification(`Caja cerrada exitosamente. Resultado: ${differenceText}`, 'success', 'Cierre de Caja');
+                        } else {
+                            this.showNotification('Error cerrando caja: ' + res.error, 'error');
+                        }
+                    })
+                    .closeCurrentCashierSession(form.countedCash, form.notes);
+            },
+            handleAddIncome(form) { this.handleCashFlow('Ingreso', form); },
+            handleAddExpense(form) { this.handleCashFlow('Salida', form); },
+            handleCashFlow(type, form) {
+                const amount = form.cashFlowAmount;
+                const description = form.cashFlowDescription;
+                if (!amount || amount <= 0) { this.showNotification('Por favor, ingrese un monto válido.', 'error', 'Dato Inválido'); return; }
+                if (!description || description.trim() === '') { this.showNotification('Por favor, ingrese una descripción.', 'error', 'Dato Inválido'); return; }
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.showNotification('Movimiento registrado exitosamente.', 'success');
+                            form.cashFlowAmount = null;
+                            form.cashFlowDescription = '';
+                            this.fetchExpectedCash();
+                        } else {
+                            this.showNotification('Error registrando movimiento: ' + res.error, 'error');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        this.loading = false;
+                        this.showNotification('ERROR DE CONEXIÓN CON EL SCRIPT: ' + err.message, 'error');
+                    })
+                    .addCashFlowTransaction(type, amount, description);
+            }
+        },
+        mounted() {
+            this.loadData();
+        }
+    });
+</script>

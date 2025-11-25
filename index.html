@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?!= include('styles'); ?>
+</head>
+
+<body>
+  <div id="app" :class="{ 'loading': loading }">
+
+    <!-- App Header -->
+    <header class="app-header">
+      <h1>Yasminisa</h1>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Show this overlay if session is NOT active -->
+      <div v-if="!activeSession && !loading" class="session-closed-overlay">
+        <h2>Caja Cerrada</h2>
+        <p>Debes abrir una sesión de caja para empezar a registrar ventas.</p>
+        <button class="btn-primary" @click="setView('cashier')">Abrir Sesión de Caja</button>
+      </div>
+
+      <!-- Main view components (only visible if session is active) -->
+      <div v-if="activeSession && !loading">
+
+        <tables-view v-if="currentView === 'tables'" :tables="tables" @select-table="selectTable"></tables-view>
+
+        <pos-view v-if="currentView === 'pos'" :table="currentTable" @open-edit="openEditModal"
+          @open-payment="goToPaymentView" @back-to-tables="setView('tables')" ref="viewComponent"></pos-view>
+
+        <orders-view v-if="currentView === 'orders'" @view-order="viewOrder"></orders-view>
+
+        <cashier-view v-if="currentView === 'cashier'" :session="activeSession" :closing-summary="closingSummary"
+          @open-session="handleOpenSession" @close-session="handleCloseSession" @add-income="handleAddIncome"
+          @add-expense="handleAddExpense" @fetch-expected-cash="fetchExpectedCash" ref="cashierView">
+        </cashier-view>
+
+        <payment-view v-if="currentView === 'payment'" :order="orderToPay" :payment-methods="paymentMethods"
+          @submit-payment="handleFinalizePayment" @back="setView('pos')"></payment-view>
+
+      </div>
+    </main>
+
+    <!-- Main Navigation -->
+    <footer class="main-nav" v-if="activeSession && !loading && currentView !== 'pos' && currentView !== 'payment'">
+      <button class="nav-btn" :class="{ active: currentView === 'tables' }" @click="setView('tables')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+        </svg>
+        <span>Mesas</span>
+      </button>
+      <button class="nav-btn" :class="{ active: currentView === 'quick-order' }" @click="setView('quick-order')"
+        disabled>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+        <span>Pedido Rápido</span>
+      </button>
+      <button class="nav-btn" :class="{ active: currentView === 'orders' }" @click="setView('orders')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <polyline points="10 9 9 9 8 9" />
+        </svg>
+        <span>Órdenes</span>
+      </button>
+      <button class="nav-btn" :class="{ active: currentView === 'cashier' }" @click="setView('cashier')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+          <line x1="1" y1="10" x2="23" y2="10" />
+        </svg>
+        <span>Caja</span>
+      </button>
+    </footer>
+
+    <!-- Global Modals -->
+    <edit-item-modal v-if="showEditModal" :item="editingItem" @close="showEditModal = false"
+      @save="saveEditItem"></edit-item-modal>
+
+    <!-- Global Notification Modal -->
+    <global-notification ref="notification"></global-notification>
+
+  </div>
+
+  <!-- TEMPLATES -->
+
+  <script type="text/x-template" id="global-notification-template">
+    <transition name="fade">
+      <div v-if="visible" class="notification-overlay" @click="close">
+        <div class="notification-modal" :class="'modal-' + type" @click.stop>
+          <svg v-if="type === 'success'" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 1rem; color: var(--success);">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <svg v-if="type === 'error'" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 1rem; color: var(--danger);">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <h3>{{ title }}</h3>
+          <p>{{ message }}</p>
+          <button class="btn-primary" @click="close">Aceptar</button>
+        </div>
+      </div>
+    </transition>
+  </script>
+
+  <script type="text/x-template" id="tables-view-template">
+    <div class="tables-grid">
+      <div v-for="table in tables" :key="table.table_id" class="table-card"
+           :class="{ 'occupied': table.status === 'Occupied', 'available': table.status === 'Available' }"
+           @click="$emit('select-table', table)">
+        <div class="table-name">{{ table.name }}</div>
+        <div class="table-status">{{ table.status }}</div>
+      </div>
+    </div>
+  </script>
+
+  <script type="text/x-template" id="orders-view-template">
+    <div>
+      <h2>Órdenes</h2>
+      <!-- Sub-tab navigation will go here -->
+      <p>Vista de órdenes en construcción.</p>
+    </div>
+  </script>
+
+  <script type="text/x-template" id="cashier-view-template">
+    <div class="cashier-view">
+      <div v-if="!session">
+        <h3>Abrir Sesión de Caja</h3>
+        <div class="form-group">
+          <label for="initialAmount">Monto Inicial en Caja (Fondo)</label>
+          <input type="number" id="initialAmount" v-model.number="form.initialAmount" placeholder="Ej: 50.00" step="0.01">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" @click="$emit('open-session', form)">Abrir Caja</button>
+        </div>
+      </div>
+      <div v-if="session">
+        <!-- Tab Navigation -->
+        <div class="modal-tabs">
+          <button class="tab-btn" :class="{ active: activeTab === 'movement' }" @click="switchTab('movement')">Registrar Movimiento</button>
+          <button class="tab-btn" :class="{ active: activeTab === 'close' }" @click="switchTab('close')">Cerrar Caja</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="modal-tab-content">
+          <!-- Register Movement Tab -->
+          <div v-if="activeTab === 'movement'">
+            <h3>Registrar Movimiento de Caja</h3>
+            <div class="form-group">
+              <label for="cashFlowAmount">Monto</label>
+              <input type="number" id="cashFlowAmount" v-model.number="form.cashFlowAmount" placeholder="Ej: 20.00" step="0.01">
+            </div>
+            <div class="form-group">
+              <label for="cashFlowDescription">Descripción</label>
+              <input type="text" id="cashFlowDescription" v-model="form.cashFlowDescription" placeholder="Ej: Compra de hielo">
+            </div>
+            <div class="modal-actions">
+              <button class="btn" @click="$emit('add-expense', form)">Registrar Salida</button>
+              <button class="btn-primary" @click="$emit('add-income', form)">Registrar Ingreso</button>
+            </div>
+
+            <hr class="modal-divider">
+
+            <div class="cash-flow-history">
+              <button class="btn-link" @click="toggleMovements">
+                <span v-if="!showMovements">Ver Movimientos de Caja</span>
+                <span v-else>Ocultar Movimientos</span>
+              </button>
+              <div v-if="showMovements && closingSummary" class="movements-list">
+                <div v-if="closingSummary.cashFlowTransactions.length === 0">No hay movimientos en esta sesión.</div>
+                <div v-for="movement in closingSummary.cashFlowTransactions" class="summary-item">
+                  <span>{{ movement.description }}</span>
+                  <span :class="{ 'income': movement.type === 'Ingreso', 'expense': movement.type === 'Salida' }">
+                    {{ movement.type === 'Ingreso' ? '+' : '-' }}S/.{{ movement.amount.toFixed(2) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Close Session Tab -->
+          <div v-if="activeTab === 'close'">
+            <h3>Cerrar Sesión de Caja</h3>
+            <div class="closing-summary" v-if="closingSummary">
+              <div class="summary-item">
+                <span>(+) Monto Inicial:</span>
+                <span>S/.{{ closingSummary.initialAmount.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item indented" v-for="(amount, method) in closingSummary.paymentMethodTotals">
+                <span>(+) Ventas ({{ method }}):</span>
+                <span>S/.{{ amount.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item">
+                <span>(+) Otros Ingresos:</span>
+                <span>S/.{{ closingSummary.totalIncome.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item">
+                <span>(-) Salidas / Gastos:</span>
+                <span>-S/.{{ closingSummary.totalExpenses.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item total">
+                <span>(=) Efectivo Esperado:</span>
+                <span>S/.{{ closingSummary.expectedCash.toFixed(2) }}</span>
+              </div>
+            </div>
+            <div v-else class="expected-cash-display">Calculando...</div>
+            <hr class="modal-divider">
+            <div class="form-group">
+              <label for="countedCash">Monto Final Contado en Caja</label>
+              <input type="number" id="countedCash" v-model.number="form.countedCash" placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label for="notes">Notas de Cierre</label>
+              <textarea id="notes" v-model="form.notes" rows="3"></textarea>
+            </div>
+            <div class="modal-actions">
+              <button class="btn-primary" @click="$emit('close-session', form)">Cerrar Caja y Ver Reporte</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </script>
+
+  <script type="text/x-template" id="pos-view-template">
+      <div class="pos-layout">
+        <!-- 1. Categories Panel -->
+        <div class="pos-categories">
+          <button v-for="category in categories" :key="category" 
+                  class="category-btn"
+                  :class="{ active: selectedCategory === category }"
+                  @click="selectCategory(category)">
+            {{ category }}
+          </button>
+        </div>
+
+        <!-- 2. Products Panel -->
+        <div class="pos-products">
+          <div class="product-grid">
+            <div v-for="product in filteredProducts" :key="product.id" class="product-card" @click="selectProduct(product)">
+              <h4>{{ product.name }}</h4>
+              <p>S/.{{ product.base_price }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Cart Panel -->
+        <div class="pos-cart">
+          <div class="cart-header">
+            <h2>Orden: {{ table ? table.name : '' }}</h2>
+            <button class="btn" @click="$emit('back-to-tables')">&larr; Volver a Mesas</button>
+          </div>
+          <div class="cart-items">
+            <div v-if="cart.length === 0" class="empty-cart">
+              El carrito está vacío.
+            </div>
+            <div v-for="(item, index) in cart" :key="item.item_id" class="cart-item">
+              <div class="cart-item-details">
+                <strong>{{ item.product_name }}</strong> <br>
+                <small>{{ item.modifiers_detail }}</small>
+                <div class="quantity-controls">
+                  <button class="btn-icon" @click="decreaseQuantity(index)">-</button>
+                  <span>{{ item.quantity }}</span>
+                  <button class="btn-icon" @click="increaseQuantity(index)">+</button>
+                </div>
+              </div>
+              <div class="cart-item-actions">
+                <span>S/.{{ (item.final_price * item.quantity).toFixed(2) }}</span>
+                <button class="btn-icon" @click="$emit('open-edit', {item, index})" title="Editar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+                <button class="btn-icon" @click="removeFromCart(index)" title="Eliminar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    <line x1="10" y1="11" x2="10" y2="17"/>
+                    <line x1="14" y1="11" x2="14" y2="17"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="cart-total">Total: S/.{{ cartTotal.toFixed(2) }}</div>
+          <div class="cart-actions">
+            <button class="btn btn-danger" @click="handleFreeUpTable">Liberar Mesa</button>
+            <button class="btn" @click="saveOrder" :disabled="cart.length === 0">Guardar Cambios</button>
+            <button class="btn-primary" @click="$emit('open-payment', { cart, cartTotal })" :disabled="cart.length === 0">Cobrar</button>
+          </div>
+        </div>
+
+        <!-- Modifier Modal -->
+        <div v-if="showProductModal" class="modal-overlay">
+          <div class="modal-content">
+            <h3>{{ selectedProduct.name }}</h3>
+            <div class="modifier-options">
+              <div v-for="(group, name) in availableModifiers" :key="name" class="modifier-group">
+                <h4>
+                  {{ name }}
+                  <span v-if="group.selection_mode === 'multiple_limited'" class="selection-hint">
+                    (elige {{ group.selection_limit }})
+                  </span>
+                </h4>
+                <div class="modifier-option" v-for="mod in group.items" :key="mod.id">
+                  <label :class="{ disabled: isModifierDisabled(name, mod) }">
+                    <input type="radio" :value="mod" v-model="selectedModifiers[name]" v-if="group.selection_mode === 'single'">
+                    <input type="checkbox" :value="mod" v-model="selectedModifiers[name]" v-else :disabled="isModifierDisabled(name, mod)">
+                    {{ mod.name }} (+S/.{{ mod.price_adjustment }})
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button @click="closeProductModal">Cancelar</button>
+              <button class="btn-primary" @click="confirmAdd" :disabled="isConfirmDisabled">Agregar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+  </script>
+
+  <script type="text/x-template" id="edit-item-modal">
+    <div class="modal-overlay">
+      <div class="modal-content">
+        <h3>Editar Item</h3>
+        <p>{{ item.product_name }}</p>
+        <div class="form-group"><label>Precio Final</label><input type="number" v-model.number="editForm.final_price"></div>
+
+        <div class="form-group"><label>Notas</label><input type="text" v-model="editForm.notes"></div>
+        <div class="modal-actions">
+          <button @click="$emit('close')">Cancelar</button>
+          <button class="btn-primary" @click="saveEdit">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </script>
+
+  <script type="text/x-template" id="payment-view-template">
+    <div class="payment-view">
+      <div class="payment-header">
+        <button class="btn" @click="$emit('back')">&larr; Volver a la Orden</button>
+        <h3>Procesar Pago</h3>
+      </div>
+      
+      <div class="payment-summary-card">
+        <div class="summary-line">
+          <span>Total a Pagar:</span>
+          <span class="total-amount">S/.{{ order.cartTotal.toFixed(2) }}</span>
+        </div>
+        <div class="summary-line">
+          <span>Total Pagado:</span>
+          <span>S/.{{ totalPaid.toFixed(2) }}</span>
+        </div>
+        <hr>
+        <div class="summary-line remaining">
+          <span>Restante:</span>
+          <span :class="{ 'zero': remainingBalance <= 0 }">S/.{{ remainingBalance.toFixed(2) }}</span>
+        </div>
+      </div>
+
+      <div class="payment-lines">
+        <div v-for="(line, index) in paymentLines" :key="index" class="payment-line">
+          <div class="form-group">
+            <label>Método de Pago</label>
+            <select v-model="line.payment_method">
+              <option disabled value="">Seleccione uno</option>
+              <option v-for="method in paymentMethods" :value="method.name">{{ method.name }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Monto</label>
+            <input type="number" v-model.number="line.amount" placeholder="0.00">
+          </div>
+          <button @click="removePaymentLine(index)" class="btn-icon" v-if="paymentLines.length > 1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      <button class="btn-link" @click="addPaymentLine">+ Agregar otro método de pago</button>
+
+      <div class="payment-view-footer">
+        <button class="btn-primary btn-full" :disabled="remainingBalance > 0.01" @click="submit">
+          Confirmar Pago de S/.{{ totalPaid.toFixed(2) }}
+        </button>
+      </div>
+    </div>
+  </script>
+
+  <!-- External Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+
+  <?!= include('scripts'); ?>
+</body>
+
+</html>
