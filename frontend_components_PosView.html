@@ -1,0 +1,115 @@
+  <script type="text/x-template" id="pos-view-template">
+      <div class="pos-layout">
+        <!-- 1. Categories Panel -->
+        <div class="pos-categories">
+          <button v-for="category in categories" :key="category" 
+                  class="category-btn"
+                  :class="{ active: selectedCategory === category }"
+                  @click="selectCategory(category)">
+            {{ category }}
+          </button>
+        </div>
+
+        <!-- 2. Products Panel -->
+        <div class="pos-products">
+          <div class="product-grid">
+            <div v-for="product in filteredProducts" :key="product.id" class="product-card" @click="selectProduct(product)">
+              <h4>{{ product.name }}</h4>
+              <p>S/.{{ product.base_price }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Cart Panel -->
+        <div class="pos-cart">
+          <div class="cart-header">
+            <h2>Orden: {{ table ? table.name : '' }}</h2>
+            <button class="btn" @click="$emit('back-to-tables')">&larr; Volver a Mesas</button>
+          </div>
+          <div class="cart-items">
+            <div v-if="cart.length === 0" class="empty-cart">
+              El carrito está vacío.
+            </div>
+            <div v-for="(item, index) in cart" :key="item.item_id" class="cart-item">
+              <div class="cart-item-details">
+                <strong>{{ item.product_name }}</strong> <br>
+                <small>{{ item.modifiers_detail }}</small>
+                <div class="quantity-controls">
+                  <button class="btn-icon" @click="decreaseQuantity(index)">-</button>
+                  <span>{{ item.quantity }}</span>
+                  <button class="btn-icon" @click="increaseQuantity(index)">+</button>
+                </div>
+              </div>
+              <div class="cart-item-actions">
+                <span>S/.{{ (item.final_price * item.quantity).toFixed(2) }}</span>
+                <button class="btn-icon" @click="$emit('open-edit', {item, index})" title="Editar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+                <button class="btn-icon" @click="removeFromCart(index)" title="Eliminar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    <line x1="10" y1="11" x2="10" y2="17"/>
+                    <line x1="14" y1="11" x2="14" y2="17"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="cart-total">Total: S/.{{ cartTotal.toFixed(2) }}</div>
+          <div class="cart-actions">
+            <button class="btn btn-danger" @click="handleFreeUpTable">Liberar Mesa</button>
+            <button class="btn" @click="saveOrder" :disabled="cart.length === 0">Guardar Cambios</button>
+            <button class="btn-primary" @click="$emit('open-payment', { cart, cartTotal })" :disabled="cart.length === 0">Cobrar</button>
+          </div>
+        </div>
+
+        <!-- Modifier Modal -->
+        <div v-if="showProductModal" class="modal-overlay">
+          <div class="modal-content">
+            <h3>{{ selectedProduct.name }}</h3>
+            <div class="modifier-options">
+              <div v-for="(group, name) in availableModifiers" :key="name" class="modifier-group">
+                <h4>
+                  {{ name }}
+                  <span v-if="group.selection_mode === 'multiple_limited'" class="selection-hint">
+                    (elige {{ group.selection_limit }})
+                  </span>
+                </h4>
+                <div class="modifier-option" v-for="mod in group.items" :key="mod.id">
+                  <label :class="{ disabled: isModifierDisabled(name, mod) }">
+                    <input type="radio" :value="mod" v-model="selectedModifiers[name]" v-if="group.selection_mode === 'single'">
+                    <input type="checkbox" :value="mod" v-model="selectedModifiers[name]" v-else :disabled="isModifierDisabled(name, mod)">
+                    {{ mod.name }} (+S/.{{ mod.price_adjustment }})
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button @click="closeProductModal">Cancelar</button>
+              <button class="btn-primary" @click="confirmAdd" :disabled="isConfirmDisabled">Agregar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+  </script>
+
+  <script type="text/x-template" id="edit-item-modal">
+    <div class="modal-overlay">
+      <div class="modal-content">
+        <h3>Editar Item</h3>
+        <p>{{ item.product_name }}</p>
+        <div class="form-group"><label>Precio Final</label><input type="number" v-model.number="editForm.final_price"></div>
+
+        <div class="form-group"><label>Notas</label><input type="text" v-model="editForm.notes"></div>
+        <div class="modal-actions">
+          <button @click="$emit('close')">Cancelar</button>
+          <button class="btn-primary" @click="saveEdit">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </script>
+

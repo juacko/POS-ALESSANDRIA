@@ -1,0 +1,15 @@
+<script type="text/x-template" id="global-notification-template">
+  <transition name="fade">
+    <div v-if="visible" class="notification-modal" :class="'notification-' + type">
+      <div class="notification-content">
+        <div class="notification-header">
+          <strong>{{ title }}</strong>
+          <button class="notification-close" @click="hide">×</button>
+        </div>
+        <div class="notification-body">
+          {{ message }}
+        </div>
+      </div>
+    </div>
+  </transition>
+</script>

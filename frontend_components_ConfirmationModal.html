@@ -1,0 +1,19 @@
+<script type="text/x-template" id="confirmation-modal-template">
+  <transition name="fade">
+    <div v-if="visible" class="modal-overlay" @click.self="handleCancel">
+      <div class="modal-content confirmation-modal">
+        <div class="modal-header">
+          <div class="warning-icon">⚠️</div>
+          <h3>{{ title }}</h3>
+        </div>
+        <div class="modal-body">
+          <p>{{ message }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="handleCancel">{{ cancelText }}</button>
+          <button class="btn-danger" @click="handleConfirm">{{ confirmText }}</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+</script>

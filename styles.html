@@ -30,7 +30,311 @@
   #app {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100vh;
+  }
+
+  /* App Header */
+  .app-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .header-left h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  /* User Info Styles */
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 8px 16px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+  }
+
+  .user-avatar {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .user-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: white;
+  }
+
+  .user-role {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 400;
+  }
+
+  .btn-logout {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    backdrop-filter: blur(10px);
+  }
+
+  .btn-logout:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .btn-logout:active {
+    transform: translateY(0);
+  }
+
+  .btn-logout svg {
+    flex-shrink: 0;
+  }
+
+  /* ===== LOGIN STYLES - INDIGO GRADIENT DESIGN ===== */
+  .login-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #e0e7ff 0%, #f1f5f9 50%, #e0e7ff 100%);
+    padding: 24px;
+    position: relative;
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 448px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 40px;
+    border-radius: 24px;
+    box-shadow: 0 20px 50px rgba(79, 70, 229, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .login-title {
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(to right, #4f46e5, #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 32px 0;
+    text-align: center;
+    letter-spacing: -0.5px;
+  }
+
+  .login-form {
+    margin-bottom: 0;
+  }
+
+  .login-form .form-group {
+    margin-bottom: 24px;
+  }
+
+  .login-form label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 8px;
+    margin-left: 4px;
+  }
+
+  .login-form input {
+    width: 100%;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    font-size: 15px;
+    color: #1f2937;
+    transition: all 0.2s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .login-form input:focus {
+    outline: none;
+    background: white;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  .login-form input::placeholder {
+    color: #9ca3af;
+  }
+
+  .btn-login {
+    width: 100%;
+    padding: 12px 16px;
+    background: #4f46e5;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);
+  }
+
+  .btn-login:hover:not(:disabled) {
+    background: #4338ca;
+  }
+
+  .btn-login:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px white, 0 0 0 4px #6366f1;
+  }
+
+  .btn-login:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .btn-login:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .loading-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .spinner {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .login-error {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    color: #dc2626;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: shake 0.3s;
+  }
+
+  @keyframes shake {
+
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+
+    25% {
+      transform: translateX(-8px);
+    }
+
+    75% {
+      transform: translateX(8px);
+    }
+  }
+
+  .login-footer {
+    margin-top: 32px;
+    text-align: center;
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .footer-text {
+    margin-bottom: 8px;
+    opacity: 0.8;
+  }
+
+  .footer-link {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 600;
+    color: #4f46e5;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .footer-link:hover {
+    color: #4338ca;
+    border-bottom-color: #4338ca;
+  }
+
+  .arrow-icon {
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    opacity: 0.7;
+    transition: transform 0.15s;
+  }
+
+  .footer-link:hover .arrow-icon {
+    transform: translateX(2px);
+  }
+
+  .copyright {
+    font-size: 12px;
+    opacity: 0.8;
+    margin-top: 8px;
   }
 
   /* Header */

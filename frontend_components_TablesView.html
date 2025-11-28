@@ -1,0 +1,10 @@
+<script type="text/x-template" id="tables-view-template">
+  <div class="tables-grid">
+    <div v-for="table in tables" :key="table.table_id" class="table-card"
+         :class="{ 'occupied': table.status === 'Ocupada', 'available': table.status === 'Disponible' }"
+         @click="$emit('select-table', table)">
+      <div class="table-name">{{ table.name }}</div>
+      <div class="table-status">{{ table.status }}</div>
+    </div>
+  </div>
+</script>

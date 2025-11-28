@@ -65,6 +65,60 @@
         }
     };
 
+    const LoginView = {
+        template: '#login-view-template',
+        data() {
+            return {
+                form: {
+                    username: '',
+                    password: ''
+                },
+                loading: false,
+                error: ''
+            };
+        },
+        methods: {
+            handleLogin() {
+                this.error = '';
+
+                if (!this.form.username || !this.form.password) {
+                    this.error = 'Por favor, completa todos los campos';
+                    return;
+                }
+
+                this.loading = true;
+                console.log('Intentando login con:', this.form.username);
+
+                google.script.run
+                    .withSuccessHandler(res => {
+                        console.log('Respuesta recibida:', res);
+                        console.log('Tipo de respuesta:', typeof res);
+                        console.log('Es null?:', res === null);
+
+                        this.loading = false;
+
+                        if (res === null) {
+                            this.error = 'Error: El servidor devolvió null. Verifica los logs de Apps Script.';
+                            return;
+                        }
+
+                        if (res.success) {
+                            console.log('Login exitoso, emitiendo evento con usuario:', res.user);
+                            this.$emit('login-success', res.user);
+                        } else {
+                            this.error = res.error;
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        console.log('Error de conexión:', err);
+                        this.loading = false;
+                        this.error = 'Error de conexión: ' + err.message;
+                    })
+                    .loginUser(this.form.username, this.form.password);
+            }
+        }
+    };
+
     const TablesView = {
         template: '#tables-view-template',
         props: ['tables']
@@ -581,19 +635,87 @@
             'edit-item-modal': EditItemModal,
             'payment-view': PaymentView,
             'global-notification': GlobalNotification,
-            'confirmation-modal': ConfirmationModal
+            'confirmation-modal': ConfirmationModal,
+            'login-view': LoginView
         },
         data: {
-            loading: true, currentView: 'tables',
-            products: [], modifiers: [], tables: [], paymentMethods: [],
-            currentTable: null, currentOrderId: null, activeSession: null,
-            showEditModal: false, editingItem: null, editingItemIndex: -1,
+            loading: true,
+            currentView: 'login',
+            currentUser: null,
+            products: [],
+            modifiers: [],
+            tables: [],
+            paymentMethods: [],
+            currentTable: null,
+            currentOrderId: null,
+            activeSession: null,
+            showEditModal: false,
+            editingItem: null,
+            editingItemIndex: -1,
             closingSummary: null,
             orderToPay: null
         },
         methods: {
             showNotification(message, type, title) {
                 this.$refs.notification.show(message, type, title);
+            },
+            handleLoginSuccess(user) {
+                this.currentUser = user;
+                localStorage.setItem('currentUser', JSON.stringify(user));
+
+                // Show welcome notification with profile icon
+                const welcomeMessage = `¡Bienvenido/a, ${user.full_name}!`;
+                this.$refs.notification.show('Inicio de Sesión Exitoso', welcomeMessage, 'success');
+
+                // Check if there's an active cashier session
+                if (this.activeSession) {
+                    this.loadData();
+                    this.setView('tables');
+                } else {
+                    this.$refs.notification.show(
+                        'Atención',
+                        'No hay una sesión de caja activa. Puedes abrir una desde el módulo de Caja.',
+                        'info'
+                    );
+                    // Still allow access to tables view
+                    this.loadData();
+                    this.setView('tables');
+                }
+            },
+            handleLogout() {
+                this.currentUser = null;
+                localStorage.removeItem('currentUser');
+                this.setView('login');
+                this.showNotification('Sesión cerrada correctamente', 'success');
+            },
+            hasPermission(action) {
+                if (!this.currentUser) return false;
+
+                const permissions = {
+                    'Administrador': ['all'],
+                    'Atención': [
+                        'view_tables',
+                        'create_order',
+                        'edit_order',
+                        'view_orders',
+                        'process_payment',
+                        'open_cashier',
+                        'close_cashier',
+                        'view_cashier',
+                        'add_cash_flow'
+                    ]
+                };
+
+                const userPermissions = permissions[this.currentUser.role] || [];
+                return userPermissions.includes('all') || userPermissions.includes(action);
+            },
+            checkSession() {
+                const savedUser = localStorage.getItem('currentUser');
+                if (savedUser) {
+                    this.currentUser = JSON.parse(savedUser);
+                    return true;
+                }
+                return false;
             },
             loadData() {
                 this.loading = true;
@@ -689,9 +811,14 @@
                         this.loading = false;
                         if (res.success) {
                             this.activeSession = res.session;
+                            this.showNotification('Sesión de caja abierta exitosamente.', 'success');
                         } else {
                             this.showNotification('Error abriendo caja: ' + res.error, 'error');
                         }
+                    })
+                    .withFailureHandler(err => {
+                        this.loading = false;
+                        this.showNotification('Error de conexión: ' + err.message, 'error', 'Error de Conexión');
                     })
                     .startNewCashierSession(form.initialAmount);
             },
@@ -753,7 +880,14 @@
             }
         },
         mounted() {
-            this.loadData();
+            // Verificar si hay sesión guardada
+            if (this.checkSession()) {
+                this.loadData();
+                this.setView('tables');
+            } else {
+                this.loading = false;
+                this.setView('login');
+            }
         }
     });
 </script>

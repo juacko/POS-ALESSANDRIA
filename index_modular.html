@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <?!= include('styles'); ?>
+</head>
+
+<body>
+    <div id="app" :class="{ 'loading': loading }">
+
+        <!-- App Header -->
+        <header class="app-header">
+            <h1>MIN MIN HELADERIA - POS v1</h1>
+            <div v-if="currentUser" class="user-info">
+                <span class="user-name">{{ currentUser.full_name }}</span>
+                <span class="user-role">{{ currentUser.role }}</span>
+                <button class="btn-logout" @click="handleLogout">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+
+            <!-- Login View -->
+            <login-view v-if="currentView === 'login' && !loading" @login-success="handleLoginSuccess"></login-view>
+
+            <!-- Main view components (only visible if user is authenticated) -->
+            <div v-if="currentUser && !loading">
+
+                <tables-view v-if="currentView === 'tables'" :tables="tables" @select-table="selectTable"></tables-view>
+
+                <pos-view v-if="currentView === 'pos'" :table="currentTable" @open-edit="openEditModal"
+                    @open-payment="goToPaymentView" @back-to-tables="setView('tables')" ref="viewComponent"></pos-view>
+
+                <orders-view v-if="currentView === 'orders'"></orders-view>
+
+                <payment-view v-if="currentView === 'payment'" :order="orderToPay" :payment-methods="paymentMethods"
+                    @submit-payment="handleFinalizePayment" @back="setView('pos')"></payment-view>
+
+            </div>
+
+            <!-- Cashier view - accessible even without active session -->
+            <cashier-view v-if="currentView === 'cashier' && !loading" :session="activeSession"
+                @open-session="handleOpenSession" @close-session="handleCloseSession" @add-income="handleAddIncome"
+                @add-expense="handleAddExpense" ref="cashierView">
+            </cashier-view>
+        </main>
+
+        <!-- Main Navigation -->
+        <footer class="main-nav"
+            v-if="currentUser && !loading && currentView !== 'pos' && currentView !== 'payment' && currentView !== 'login'">
+            <button class="nav-btn" :class="{ active: currentView === 'tables' }" @click="setView('tables')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                </svg>
+                <span>Mesas</span>
+            </button>
+            <button class="nav-btn" :class="{ active: currentView === 'orders' }" @click="setView('orders')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <span>Órdenes</span>
+            </button>
+            <button class="nav-btn" :class="{ active: currentView === 'cashier' }" @click="setView('cashier')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                    <line x1="1" y1="10" x2="23" y2="10" />
+                </svg>
+                <span>Caja</span>
+            </button>
+        </footer>
+
+        <!-- Global Notification Component -->
+        <global-notification ref="notification"></global-notification>
+
+        <!-- Confirmation Modal Component -->
+        <confirmation-modal ref="confirmModal"></confirmation-modal>
+
+        <!-- Edit Item Modal Component -->
+        <edit-item-modal v-if="showEditModal" :item="editingItem" :modifiers="modifiers" @save="saveEditedItem"
+            @cancel="showEditModal = false">
+        </edit-item-modal>
+
+    </div>
+
+    <!-- Include Component Templates -->
+    <?!= include('frontend_components_GlobalNotification'); ?>
+    <?!= include('frontend_components_ConfirmationModal'); ?>
+    <?!= include('frontend_components_LoginView'); ?>
+    <?!= include('frontend_components_TablesView'); ?>
+    <?!= include('frontend_components_PosView'); ?>
+    <?!= include('frontend_components_OrdersView'); ?>
+    <?!= include('frontend_components_CashierView'); ?>
+    <?!= include('frontend_components_PaymentView'); ?>
+    <?!= include('frontend_components_EditItemModal'); ?>
+
+    <!-- Include Vue.js -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+
+    <!-- Include Component Scripts -->
+    <?!= include('scripts'); ?>
+
+</body>
+
+</html>

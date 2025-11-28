@@ -12,20 +12,41 @@
 
     <!-- App Header -->
     <header class="app-header">
-      <h1>MIN MIN HELADERIA - POS v1</h1>
+      <div class="header-left">
+        <h1>MIN MIN HELADERIA - POS</h1>
+      </div>
+      <div v-if="currentUser" class="header-right">
+        <div class="user-info">
+          <div class="user-avatar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <div class="user-details">
+            <span class="user-name">{{ currentUser.full_name }}</span>
+            <span class="user-role">{{ currentUser.role }}</span>
+          </div>
+        </div>
+        <button class="btn-logout" @click="handleLogout" title="Cerrar Sesión">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          <span>Salir</span>
+        </button>
+      </div>
     </header>
 
     <!-- Main Content Area -->
     <main class="main-content">
-      <!-- Show this overlay if session is NOT active -->
-      <div v-if="!activeSession && !loading" class="session-closed-overlay">
-        <h2>Caja Cerrada</h2>
-        <p>Debes abrir una sesión de caja para empezar a registrar ventas.</p>
-        <button class="btn-primary" @click="setView('cashier')">Abrir Sesión de Caja</button>
-      </div>
 
-      <!-- Main view components (only visible if session is active) -->
-      <div v-if="activeSession && !loading">
+      <!-- Login View -->
+      <login-view v-if="currentView === 'login' && !loading" @login-success="handleLoginSuccess"></login-view>
+
+      <!-- Main view components (only visible if user is authenticated) -->
+      <div v-if="currentUser && !loading">
 
         <tables-view v-if="currentView === 'tables'" :tables="tables" @select-table="selectTable"></tables-view>
 
@@ -34,19 +55,21 @@
 
         <orders-view v-if="currentView === 'orders'"></orders-view>
 
-        <cashier-view v-if="currentView === 'cashier'" :session="activeSession" @open-session="handleOpenSession"
-          @close-session="handleCloseSession" @add-income="handleAddIncome" @add-expense="handleAddExpense"
-          ref="cashierView">
-        </cashier-view>
-
         <payment-view v-if="currentView === 'payment'" :order="orderToPay" :payment-methods="paymentMethods"
           @submit-payment="handleFinalizePayment" @back="setView('pos')"></payment-view>
 
       </div>
+
+      <!-- Cashier view - accessible even without active session -->
+      <cashier-view v-if="currentView === 'cashier' && !loading" :session="activeSession"
+        @open-session="handleOpenSession" @close-session="handleCloseSession" @add-income="handleAddIncome"
+        @add-expense="handleAddExpense" ref="cashierView">
+      </cashier-view>
     </main>
 
     <!-- Main Navigation -->
-    <footer class="main-nav" v-if="activeSession && !loading && currentView !== 'pos' && currentView !== 'payment'">
+    <footer class="main-nav"
+      v-if="currentUser && !loading && currentView !== 'pos' && currentView !== 'payment' && currentView !== 'login'">
       <button class="nav-btn" :class="{ active: currentView === 'tables' }" @click="setView('tables')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
@@ -141,6 +164,48 @@
         </div>
       </div>
     </transition>
+  </script>
+
+  <script type="text/x-template" id="login-view-template">
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <h1>MIN MIN HELADERIA</h1>
+          <p>Sistema POS v1</p>
+        </div>
+        
+        <form @submit.prevent="handleLogin" class="login-form">
+          <div class="form-group">
+            <label for="username">Usuario</label>
+            <input 
+              type="text" 
+              id="username" 
+              v-model="form.username" 
+              placeholder="Ingresa tu usuario"
+              required
+              autofocus>
+          </div>
+          
+          <div class="form-group">
+            <label for="password">Contraseña</label>
+            <input 
+              type="password" 
+              id="password" 
+              v-model="form.password" 
+              placeholder="Ingresa tu contraseña"
+              required>
+          </div>
+          
+          <button type="submit" class="btn-primary btn-full" :disabled="loading">
+            {{ loading ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
+          </button>
+        </form>
+        
+        <div v-if="error" class="login-error">
+          {{ error }}
+        </div>
+      </div>
+    </div>
   </script>
 
   <script type="text/x-template" id="tables-view-template">

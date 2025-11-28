@@ -1,0 +1,124 @@
+  <script type="text/x-template" id="cashier-view-template">
+    <div class="cashier-view">
+      <div v-if="!session">
+        <h3>Abrir Sesión de Caja</h3>
+        <div class="form-group">
+          <label for="initialAmount">Monto Inicial en Caja (Fondo)</label>
+          <input type="number" id="initialAmount" v-model.number="form.initialAmount" placeholder="Ej: 50.00" step="0.01">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" @click="$emit('open-session', form)">Abrir Caja</button>
+        </div>
+      </div>
+      <div v-if="session">
+        <!-- Tab Navigation -->
+        <div class="modal-tabs">
+          <button class="tab-btn" :class="{ active: activeTab === 'movements' }" @click="switchTab('movements')">Movimientos</button>
+          <button class="tab-btn" :class="{ active: activeTab === 'summary' }" @click="switchTab('summary')">Resumen</button>
+          <button class="tab-btn" :class="{ active: activeTab === 'close' }" @click="switchTab('close')">Cerrar Caja</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="modal-tab-content">
+          
+          <!-- Movements Tab -->
+          <div v-if="activeTab === 'movements'">
+            <h3>Registrar Movimiento de Caja</h3>
+            <div class="form-group">
+              <label for="cashFlowAmount">Monto</label>
+              <input type="number" id="cashFlowAmount" v-model.number="form.cashFlowAmount" placeholder="Ej: 20.00" step="0.01">
+            </div>
+            <div class="form-group">
+              <label for="cashFlowDescription">Descripción</label>
+              <input type="text" id="cashFlowDescription" v-model="form.cashFlowDescription" placeholder="Ej: Compra de hielo">
+            </div>
+            <div class="modal-actions">
+              <button class="btn" @click="$emit('add-expense', form)">Registrar Salida</button>
+              <button class="btn-primary" @click="$emit('add-income', form)">Registrar Ingreso</button>
+            </div>
+
+            <hr class="modal-divider">
+
+            <div class="cash-flow-section">
+              <div class="section-header">
+                <h4>Movimientos de Esta Sesión</h4>
+                <button class="btn-link" @click="loadMovements" :disabled="movements.loading">
+                  {{ movements.loading ? 'Cargando...' : '🔄 Refrescar' }}
+                </button>
+              </div>
+              
+              <div v-if="movements.loading" class="empty-state">Cargando movimientos...</div>
+              <div v-else-if="movements.list.length === 0" class="empty-state">
+                No hay movimientos en esta sesión.
+              </div>
+              <div v-else class="movements-list">
+                <div v-for="movement in movements.list" :key="movement.transaction_id" class="movement-item">
+                  <span class="movement-desc">{{ movement.description }}</span>
+                  <span :class="['movement-amount', movement.type === 'Ingreso' ? 'income' : 'expense']">
+                    {{ movement.type === 'Ingreso' ? '+' : '-' }}S/.{{ movement.amount.toFixed(2) }}
+                  </span>
+                </div>
+                <div class="movements-totals">
+                  <div class="total-row">
+                    <span>Total Ingresos:</span>
+                    <span class="income">+S/.{{ movements.totalIncome.toFixed(2) }}</span>
+                  </div>
+                  <div class="total-row">
+                    <span>Total Salidas:</span>
+                    <span class="expense">-S/.{{ movements.totalExpenses.toFixed(2) }}</span>
+                  </div>
+                  <div class="total-row net">
+                    <span>Neto:</span>
+                    <span :class="movements.net >= 0 ? 'income' : 'expense'">
+                      {{ movements.net >= 0 ? '+' : '' }}S/.{{ movements.net.toFixed(2) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary Tab -->
+          <div v-if="activeTab === 'summary'">
+            <div class="section-header">
+              <h3>Estado Actual de Caja</h3>
+              <button class="btn-link" @click="loadSummary" :disabled="summary.loading">
+                {{ summary.loading ? 'Cargando...' : '🔄 Refrescar' }}
+              </button>
+            </div>
+            
+            <div v-if="summary.loading" class="empty-state">Calculando...</div>
+            <div v-else-if="summary.data" class="closing-summary">
+              <div class="summary-item">
+                <span>(+) Monto Inicial:</span>
+                <span>S/.{{ summary.data.initialAmount.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item indented" v-for="(amount, method) in summary.data.paymentMethodTotals" :key="method">
+                <span>(+) Ventas ({{ method }}):</span>
+                <span>S/.{{ amount.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item">
+                <span>(+) Otros Ingresos:</span>
+                <span>S/.{{ summary.data.totalIncome.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item">
+                <span>(-) Salidas / Gastos:</span>
+                <span>-S/.{{ summary.data.totalExpenses.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item total">
+                <span>(=) Efectivo Esperado:</span>
+                <span>S/.{{ summary.data.expectedCash.toFixed(2) }}</span>
+              </div>
+              <div class="info-box">
+                <p>ℹ️ Este es el efectivo que debería haber en caja al momento de cerrar.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Close Cash Tab -->
+          <div v-if="activeTab === 'close'">
+            <h3>Cerrar Sesión de Caja</h3>
+            
+            <div v-if="closing.loading" class="empty-state">Calculando...</div>
+            <div v-else-if="closing.summary" class="closing-summary">
+              <h4>Resumen Final</h4>
