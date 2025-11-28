@@ -1,75 +1,62 @@
 /**
- * Shared Utility Functions
- * Common functions used across the application
+ * backend_Utils.gs
+ * Helper functions for Google Sheets interaction.
  */
 
+function getSpreadsheet() {
+  if (typeof SPREADSHEET_ID === 'undefined' || SPREADSHEET_ID === "YOUR_SPREADSHEET_ID_HERE") {
+    throw new Error(
+      'CONFIGURACIÓN REQUERIDA: Por favor, verifica el archivo backend_Config.gs.',
+    );
+  }
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
 /**
- * Converts sheet data to array of objects
- * @param {string} sheetName - Name of the sheet
- * @returns {Array<Object>} Array of objects with column headers as keys
+ * Reads all data from a sheet and returns it as an array of objects.
  */
 function getSheetData(sheetName) {
-  var ss = getSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName);
-  
-  if (!sheet) {
-    throw new Error('Sheet "' + sheetName + '" not found');
+  const ss = getSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+
+  const data = sheet.getDataRange().getValues();
+  // If sheet is empty or only has a header, return an empty array to avoid errors.
+  if (data.length < 2) {
+    return [];
   }
-  
-  var data = sheet.getDataRange().getValues();
-  if (data.length === 0) return [];
-  
-  var headers = data[0];
-  var rows = [];
-  
-  for (var i = 1; i < data.length; i++) {
-    var row = {};
-    for (var j = 0; j < headers.length; j++) {
-      row[headers[j]] = data[i][j];
-    }
-    rows.push(row);
-  }
-  
-  return rows;
+
+  const headers = data.shift(); // Remove header row
+
+  return data.map((row) => {
+    let obj = {};
+    headers.forEach((header, index) => {
+      // Ensure row has a value at this index to prevent errors
+      obj[header] = index < row.length ? row[index] : undefined;
+    });
+    return obj;
+  });
 }
 
 /**
- * Converts object to sheet row based on headers
- * @param {Array<string>} headers - Array of column headers
- * @param {Object} obj - Object to convert
- * @returns {Array} Array of values in header order
+ * Helper to convert a sheet row to an object using headers.
  */
-function objectToSheetRow(headers, obj) {
-  var row = [];
-  for (var i = 0; i < headers.length; i++) {
-    var value = obj[headers[i]];
-    row.push(value !== undefined ? value : '');
-  }
-  return row;
+function _sheetRowToObject(headers, rowData) {
+  const obj = {};
+  headers.forEach((header, i) => {
+    obj[header] = rowData[i];
+  });
+  return obj;
 }
 
 /**
- * Logs info message with timestamp
- * @param {string} message - Message to log
+ * Helper to convert an object to a sheet row based on headers.
  */
-function logInfo(message) {
-  Logger.log('[INFO] ' + new Date().toISOString() + ' - ' + message);
-}
-
-/**
- * Logs error message with timestamp
- * @param {string} message - Error message
- * @param {Error} error - Error object
- */
-function logError(message, error) {
-  Logger.log('[ERROR] ' + new Date().toISOString() + ' - ' + message + ': ' + error.toString());
-}
-
-/**
- * Include HTML files for modular structure
- * @param {string} filename - Name of the file to include
- * @returns {string} Content of the file
- */
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+function _objectToSheetRow(headers, obj) {
+  const rowData = [];
+  headers.forEach((header) => {
+    // Ensure all header keys are present in the object, or default to empty string
+    rowData.push(obj.hasOwnProperty(header) ? obj[header] : "");
+  });
+  return rowData;
 }

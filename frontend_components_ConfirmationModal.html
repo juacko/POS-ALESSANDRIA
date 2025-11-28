@@ -1,17 +1,19 @@
 <script type="text/x-template" id="confirmation-modal-template">
   <transition name="fade">
-    <div v-if="visible" class="modal-overlay" @click.self="handleCancel">
-      <div class="modal-content confirmation-modal">
-        <div class="modal-header">
-          <div class="warning-icon">⚠️</div>
-          <h3>{{ title }}</h3>
+    <div v-if="visible" class="modal-overlay" @click="cancel">
+      <div class="confirmation-modal" @click.stop>
+        <div class="confirmation-icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
         </div>
-        <div class="modal-body">
-          <p>{{ message }}</p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" @click="handleCancel">{{ cancelText }}</button>
-          <button class="btn-danger" @click="handleConfirm">{{ confirmText }}</button>
+        <h3>{{ title }}</h3>
+        <p>{{ message }}</p>
+        <div class="confirmation-actions">
+          <button class="btn" @click="cancel">{{ cancelText }}</button>
+          <button class="btn-primary" @click="confirm">{{ confirmText }}</button>
         </div>
       </div>
     </div>

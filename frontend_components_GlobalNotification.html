@@ -1,14 +1,24 @@
 <script type="text/x-template" id="global-notification-template">
   <transition name="fade">
-    <div v-if="visible" class="notification-modal" :class="'notification-' + type">
-      <div class="notification-content">
-        <div class="notification-header">
-          <strong>{{ title }}</strong>
-          <button class="notification-close" @click="hide">×</button>
-        </div>
-        <div class="notification-body">
-          {{ message }}
-        </div>
+    <div v-if="visible" class="notification-overlay" @click="close">
+      <div class="notification-modal" :class="'modal-' + type" @click.stop>
+        <svg v-if="type === 'success'" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 1rem; color: var(--success);">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <svg v-if="type === 'error'" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 1rem; color: var(--danger);">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <svg v-if="type === 'info'" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 1rem; color: var(--primary);">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <h3>{{ title }}</h3>
+        <p>{{ message }}</p>
+        <button class="btn-primary" @click="close">Aceptar</button>
       </div>
     </div>
   </transition>

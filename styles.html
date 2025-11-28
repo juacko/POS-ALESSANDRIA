@@ -33,91 +33,131 @@
     min-height: 100vh;
   }
 
-  /* App Header */
+  /* App Header - Minimalist Design */
   .app-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 16px 24px;
+    background: var(--bg-white);
+    color: var(--text-dark);
+    padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid var(--border);
+    height: 60px;
   }
 
   .header-left h1 {
     margin: 0;
-    font-size: 1.4rem;
-    font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-dark);
     letter-spacing: -0.5px;
   }
 
   .header-right {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
   }
 
-  /* User Info Styles */
+  /* User Info Styles - Minimalist */
   .user-info {
     display: flex;
     align-items: center;
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.15);
-    padding: 8px 16px;
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
+    gap: 10px;
+    padding: 0;
+    background: none;
+    border: none;
   }
 
   .user-avatar {
-    width: 40px;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.2);
+    width: 36px;
+    height: 36px;
+    background: var(--bg-main);
+    color: var(--primary);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--border);
   }
 
   .user-details {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0;
   }
 
   .user-name {
     font-weight: 600;
-    font-size: 0.95rem;
-    color: white;
+    font-size: 0.9rem;
+    color: var(--text-dark);
+    line-height: 1.2;
   }
 
   .user-role {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.75rem;
+    color: var(--text-light);
     font-weight: 400;
   }
 
   .btn-logout {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
-    padding: 10px 18px;
-    border-radius: 8px;
+    gap: 6px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-light);
+    padding: 8px 12px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
     transition: all 0.2s;
-    backdrop-filter: blur(10px);
   }
 
   .btn-logout:hover {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: #fee2e2;
+    color: var(--danger);
+    border-color: #fecaca;
+  }
+
+  /* Mobile Responsiveness for Header */
+  @media (max-width: 600px) {
+    .app-header {
+      padding: 8px 12px;
+      height: 54px;
+    }
+
+    .header-subtitle {
+      display: none;
+      /* Hide "HELADERIA - POS" on mobile */
+    }
+
+    .user-details {
+      display: none;
+      /* Hide user name/role on mobile */
+    }
+
+    .btn-logout span {
+      display: none;
+      /* Hide "Salir" text on mobile */
+    }
+
+    .btn-logout {
+      padding: 8px;
+      /* Square button for icon only */
+      border: none;
+      /* Cleaner look on mobile */
+    }
+
+    .btn-logout:hover {
+      background: none;
+      color: var(--danger);
+    }
+
+    .header-right {
+      gap: 8px;
+    }
   }
 
   .btn-logout:active {
@@ -343,8 +383,9 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 24px;
-    background-color: var(--bg-white);
-    border-bottom: 1px solid var(--border);
+    background-color: var(--primary);
+    color: white;
+    border-bottom: 1px solid var(--primary-dark);
     flex-shrink: 0;
     box-shadow: 0 1px 3px var(--shadow);
   }
@@ -352,7 +393,7 @@
   .app-header h1 {
     font-size: 1.5em;
     font-weight: 700;
-    color: var(--primary);
+    color: white;
     letter-spacing: -0.02em;
   }
 

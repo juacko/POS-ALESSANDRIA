@@ -594,7 +594,7 @@
     };
 
     const PaymentView = {
-        template: '#payment-view-template',
+        template: '#payment-view-template-v2',
         props: ['order', 'paymentMethods'],
         data() { return { paymentLines: [] }; },
         computed: {
@@ -617,9 +617,18 @@
                     payments: this.paymentLines,
                     totalAmount: this.order.cartTotal
                 });
+            },
+            // Add a check to ensure order exists
+            validateOrder() {
+                if (!this.order || typeof this.order.cartTotal === 'undefined') {
+                    console.error('PaymentView: Order is missing or invalid', this.order);
+                    this.$root.showNotification('Error: Datos de orden inválidos', 'error');
+                    this.$emit('back');
+                }
             }
         },
         mounted() {
+            this.validateOrder();
             if (this.order) this.initPaymentLines();
         }
     };
@@ -741,8 +750,6 @@
                     })
                     .getInitialData();
             },
-            // The handleFetchCashFlowMovements method is removed as it's no longer needed
-            // CashierView now directly emits fetch-expected-cash
             setView(view) {
                 if (this.currentView === 'pos' && view !== 'pos' && view !== 'payment') {
                     this.currentTable = null; this.currentOrderId = null;
@@ -802,99 +809,102 @@
                         if (res.success) {
                             this.closingSummary = res.summary;
                         } else {
-                            this.showNotification('Error calculando el resumen de caja: ' + res.error, 'error');
+                            this.showNotification('Error obteniendo resumen de caja: ' + res.error, 'error');
                         }
                     })
                     .getExpectedCash();
             },
             handleOpenSession(form) {
-                if (form.initialAmount === null || form.initialAmount < 0) {
-                    this.showNotification('Por favor, ingrese un monto inicial válido.', 'error', 'Dato Inválido');
-                    return;
-                }
                 this.loading = true;
                 google.script.run
                     .withSuccessHandler(res => {
                         this.loading = false;
                         if (res.success) {
                             this.activeSession = res.session;
-                            this.showNotification('Sesión de caja abierta exitosamente.', 'success');
+                            this.showNotification('Caja abierta correctamente', 'success');
+                            this.loadData(); // Reload data to update UI
                         } else {
-                            this.showNotification('Error abriendo caja: ' + res.error, 'error');
+                            this.showNotification('Error al abrir caja: ' + res.error, 'error');
                         }
                     })
                     .withFailureHandler(err => {
                         this.loading = false;
-                        this.showNotification('Error de conexión: ' + err.message, 'error', 'Error de Conexión');
+                        this.showNotification('Error de conexión: ' + err.message, 'error');
                     })
                     .startNewCashierSession(form.initialAmount);
             },
-            handleCloseSession(form) {
-                if (form.countedCash === null || form.countedCash < 0) {
-                    this.showNotification('Por favor, ingrese el monto contado en caja.', 'error', 'Dato Inválido');
-                    return;
-                }
+            handleCloseSession(data) {
                 this.loading = true;
                 google.script.run
                     .withSuccessHandler(res => {
                         this.loading = false;
                         if (res.success) {
-                            this.activeSession = null;
-                            const report = res.closingReport;
-                            let differenceText = '';
-                            if (report.difference > 0) {
-                                differenceText = `Sobrante: S/.${report.difference.toFixed(2)}`;
-                            } else if (report.difference < 0) {
-                                differenceText = `Faltante: S/.${Math.abs(report.difference).toFixed(2)}`;
-                            } else {
-                                differenceText = 'Cuadre Exacto';
-                            }
-                            this.showNotification(`Caja cerrada exitosamente. Resultado: ${differenceText}`, 'success', 'Cierre de Caja');
+                            this.activeSession = null; // Session closed
+                            this.showNotification('Caja cerrada correctamente', 'success');
+                            this.loadData();
+                            this.setView('login'); // Redirect to login or stay in cashier? Usually logout or reset.
                         } else {
-                            this.showNotification('Error cerrando caja: ' + res.error, 'error');
-                        }
-                    })
-                    .closeCurrentCashierSession(form.countedCash, form.notes);
-            },
-            handleAddIncome(form) { this.handleCashFlow('Ingreso', form); },
-            handleAddExpense(form) { this.handleCashFlow('Salida', form); },
-            handleCashFlow(type, form) {
-                const amount = form.cashFlowAmount;
-                const description = form.cashFlowDescription;
-                if (!amount || amount <= 0) { this.showNotification('Por favor, ingrese un monto válido.', 'error', 'Dato Inválido'); return; }
-                if (!description || description.trim() === '') { this.showNotification('Por favor, ingrese una descripción.', 'error', 'Dato Inválido'); return; }
-                this.loading = true;
-                google.script.run
-                    .withSuccessHandler(res => {
-                        this.loading = false;
-                        if (res.success) {
-                            this.showNotification('Movimiento registrado exitosamente.', 'success');
-                            form.cashFlowAmount = null;
-                            form.cashFlowDescription = '';
-                            // Reload movements in cashier component
-                            if (this.$refs.cashierView) {
-                                this.$refs.cashierView.loadMovements();
-                            }
-                        } else {
-                            this.showNotification('Error registrando movimiento: ' + res.error, 'error');
+                            this.showNotification('Error al cerrar caja: ' + res.error, 'error');
                         }
                     })
                     .withFailureHandler(err => {
                         this.loading = false;
-                        this.showNotification('ERROR DE CONEXIÓN CON EL SCRIPT: ' + err.message, 'error');
+                        this.showNotification('Error de conexión: ' + err.message, 'error');
                     })
-                    .addCashFlowTransaction(type, amount, description);
+                    .closeCurrentCashierSession(data.countedCash, data.notes);
+            },
+            handleAddIncome(form) {
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.showNotification('Ingreso registrado', 'success');
+                            // Refresh movements in CashierView
+                            if (this.$refs.cashierView) {
+                                this.$refs.cashierView.loadMovements();
+                                // Clear form
+                                form.cashFlowAmount = null;
+                                form.cashFlowDescription = '';
+                            }
+                        } else {
+                            this.showNotification('Error al registrar ingreso: ' + res.error, 'error');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        this.loading = false;
+                        this.showNotification('Error de conexión: ' + err.message, 'error');
+                    })
+                    .addCashFlowTransaction('Ingreso', form.cashFlowAmount, form.cashFlowDescription);
+            },
+            handleAddExpense(form) {
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.showNotification('Salida registrada', 'success');
+                            // Refresh movements in CashierView
+                            if (this.$refs.cashierView) {
+                                this.$refs.cashierView.loadMovements();
+                                // Clear form
+                                form.cashFlowAmount = null;
+                                form.cashFlowDescription = '';
+                            }
+                        } else {
+                            this.showNotification('Error al registrar salida: ' + res.error, 'error');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        this.loading = false;
+                        this.showNotification('Error de conexión: ' + err.message, 'error');
+                    })
+                    .addCashFlowTransaction('Salida', form.cashFlowAmount, form.cashFlowDescription);
             }
         },
         mounted() {
-            // Verificar si hay sesión guardada
-            if (this.checkSession()) {
-                this.loadData();
-                this.setView('tables');
-            } else {
-                this.loading = false;
-                this.setView('login');
-            }
+            this.checkSession();
+            this.loadData();
         }
     });
 </script>
