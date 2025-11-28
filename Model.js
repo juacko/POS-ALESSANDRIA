@@ -76,7 +76,7 @@ function createOrder(tableId) {
   sheet.appendRow([orderId, new Date(), tableId, "Open", 0, ""]);
 
   // Update table status
-  updateTableStatus(tableId, "Occupied");
+  updateTableStatus(tableId, "Ocupada");
 
   return orderId;
 }
@@ -154,7 +154,7 @@ function overwriteOrderItems(orderId, items) {
     }
     return _objectToSheetRow(headers, item);
   });
-  
+
   sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAdd.length, headers.length).setValues(rowsToAdd);
   SpreadsheetApp.flush();
 }
@@ -321,7 +321,7 @@ function updateCashierSession(sessionData) {
     .getRange(rowIndex + 1, 1, 1, sheet.getLastColumn())
     .setValues([updatedRowData]);
   SpreadsheetApp.flush();
-  
+
   // FIX: Convert Date objects to strings before returning to avoid serialization errors.
   if (updatedRowObj.open_timestamp instanceof Date) {
     updatedRowObj.open_timestamp = updatedRowObj.open_timestamp.toLocaleString();
@@ -498,3 +498,79 @@ function deleteOrder(orderId) {
 }
 
 // --- FIN CODIGO GESTION DE ORDENES ABIERTAS ---
+
+// --- INICIO CODIGO VISTA DE ORDENES ---
+
+/**
+ * Obtiene todas las órdenes activas (Open) con sus items y totales calculados.
+ * @returns {Array<Object>} Array de órdenes activas con items y totales.
+ */
+function getActiveOrders() {
+  const orders = getSheetData("Orders");
+  const activeOrders = orders.filter(o => o.status === "Open");
+
+  // Para cada orden, obtener sus items y calcular total
+  return activeOrders.map(order => {
+    const items = getOrderItemsByOrderId(order.order_id);
+    const total = items.reduce((sum, item) =>
+      sum + (Number(item.final_price) * Number(item.quantity)), 0);
+
+    // Convert Date to string to avoid serialization issues
+    let timestamp = order.timestamp;
+    if (timestamp instanceof Date) {
+      timestamp = timestamp.toISOString();
+    }
+
+    return {
+      order_id: order.order_id,
+      timestamp: timestamp,
+      table_number: order.table_number,
+      status: order.status,
+      items: items,
+      total: total,
+      item_count: items.length
+    };
+  });
+}
+
+/**
+ * Obtiene el historial de órdenes pagadas con sus pagos asociados.
+ * @returns {Array<Object>} Array de órdenes pagadas con información de pagos.
+ */
+function getPaidOrders() {
+  const orders = getSheetData("Orders");
+  const paidOrders = orders.filter(o => o.status === "Paid");
+
+  return paidOrders.map(order => {
+    const payments = getSheetData("Payments")
+      .filter(p => p.order_id === order.order_id);
+
+    // Convert Date to string to avoid serialization issues
+    let timestamp = order.timestamp;
+    if (timestamp instanceof Date) {
+      timestamp = timestamp.toISOString();
+    }
+
+    return {
+      order_id: order.order_id,
+      timestamp: timestamp,
+      table_number: order.table_number,
+      status: order.status,
+      total_amount: Number(order.total_amount || 0),
+      payments: payments.map(p => {
+        let paymentTimestamp = p.timestamp;
+        if (paymentTimestamp instanceof Date) {
+          paymentTimestamp = paymentTimestamp.toISOString();
+        }
+        return {
+          payment_id: p.payment_id,
+          payment_method: p.payment_method,
+          amount: Number(p.amount || 0),
+          timestamp: paymentTimestamp
+        };
+      })
+    };
+  }).reverse(); // Más recientes primero
+}
+
+// --- FIN CODIGO VISTA DE ORDENES ---

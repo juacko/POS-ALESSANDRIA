@@ -30,7 +30,17 @@ function getExpectedCash() {
     });
 
     // 2. Get and calculate income and expenses
-    const cashFlowTransactions = getCashFlowBySessionId(activeSession.session_id);
+    let cashFlowTransactions = getCashFlowBySessionId(activeSession.session_id);
+
+    // SANITIZE: Convert Date objects to strings to avoid serialization errors
+    cashFlowTransactions = cashFlowTransactions.map(t => {
+      const sanitized = { ...t };
+      if (sanitized.timestamp instanceof Date) {
+        sanitized.timestamp = sanitized.timestamp.toLocaleString();
+      }
+      return sanitized;
+    });
+
     const totalIncome = cashFlowTransactions
       .filter(t => t.type === 'Ingreso')
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -44,14 +54,15 @@ function getExpectedCash() {
     const expectedCash = initialAmount + totalCashSales + totalIncome - totalExpenses;
 
     // 4. Return the detailed summary object
-    return { 
+    return {
       success: true,
       summary: {
         initialAmount: initialAmount,
         paymentMethodTotals: paymentMethodTotals,
         totalIncome: totalIncome,
         totalExpenses: totalExpenses,
-        expectedCash: expectedCash
+        expectedCash: expectedCash,
+        cashFlowTransactions: cashFlowTransactions
       }
     };
 
@@ -102,7 +113,7 @@ function addCashFlowTransaction(type, amount, description) {
 
     const result = createCashFlowTransaction(transactionData);
     return { success: true, transaction: result };
-  
+
   } catch (e) {
     Logger.log('Error en addCashFlowTransaction: ' + e.toString());
     return { success: false, error: e.toString() };
@@ -123,7 +134,7 @@ function closeCurrentCashierSession(countedCash, notes) {
 
     // VALIDATION: Check for open tables
     const tables = getTables();
-    const openTables = tables.filter(t => t.status === 'Occupied');
+    const openTables = tables.filter(t => t.status === 'Ocupada');
     if (openTables.length > 0) {
       const tableNames = openTables.map(t => t.name).join(', ');
       throw new Error('No se puede cerrar la caja. Las siguientes mesas siguen abiertas: ' + tableNames);
@@ -134,7 +145,7 @@ function closeCurrentCashierSession(countedCash, notes) {
     const totalCashSales = sessionPayments
       .filter(p => p.payment_method && p.payment_method.trim().toUpperCase() === 'EFECTIVO')
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    
+
     // 2. Obtener y calcular ingresos y salidas
     const cashFlowTransactions = getCashFlowBySessionId(activeSession.session_id);
     const totalIncome = cashFlowTransactions
@@ -161,7 +172,7 @@ function closeCurrentCashierSession(countedCash, notes) {
     };
 
     const updatedSession = updateCashierSession(closingData);
-    
+
     return { success: true, closingReport: updatedSession };
 
   } catch (e) {
@@ -217,11 +228,11 @@ function finalizeOrderAndPay(orderId, payments, totalAmount) {
     const updatedOrder = updateOrder(orderId, orderUpdateData);
 
     if (updatedOrder && updatedOrder.table_number) {
-      updateTableStatus(updatedOrder.table_number, 'Available');
+      updateTableStatus(updatedOrder.table_number, 'Disponible');
     } else {
       Logger.log('Advertencia: No se pudo actualizar el estado de la mesa para la orden ' + orderId);
     }
-    
+
     return { success: true };
 
   } catch (e) {
@@ -281,11 +292,47 @@ function forceFreeUpTable(tableId, orderId) {
   try {
     deleteOrderItemsByOrderId(orderId);
     deleteOrder(orderId);
-    updateTableStatus(tableId, 'Available');
-    
+    updateTableStatus(tableId, 'Disponible');
+
     return { success: true };
   } catch (e) {
     Logger.log('Error in forceFreeUpTable: ' + e.toString());
+    return { success: false, error: e.toString() };
+  }
+}
+
+// --- FUNCIONES PARA VISTA DE ORDENES ---
+
+/**
+ * Obtiene las órdenes activas para mostrar en la vista.
+ * @returns {Object} Resultado con las órdenes activas o error.
+ */
+function getActiveOrdersData() {
+  try {
+    Logger.log('getActiveOrdersData: Iniciando...');
+    const activeOrders = getActiveOrders();
+    Logger.log('getActiveOrdersData: Órdenes encontradas: ' + activeOrders.length);
+    return { success: true, orders: activeOrders };
+  } catch (e) {
+    Logger.log('Error en getActiveOrdersData: ' + e.toString());
+    Logger.log('Stack trace: ' + e.stack);
+    return { success: false, error: e.toString() };
+  }
+}
+
+/**
+ * Obtiene el historial de órdenes pagadas.
+ * @returns {Object} Resultado con el historial de órdenes o error.
+ */
+function getPaidOrdersHistory() {
+  try {
+    Logger.log('getPaidOrdersHistory: Iniciando...');
+    const paidOrders = getPaidOrders();
+    Logger.log('getPaidOrdersHistory: Órdenes pagadas encontradas: ' + paidOrders.length);
+    return { success: true, orders: paidOrders };
+  } catch (e) {
+    Logger.log('Error en getPaidOrdersHistory: ' + e.toString());
+    Logger.log('Stack trace: ' + e.stack);
     return { success: false, error: e.toString() };
   }
 }

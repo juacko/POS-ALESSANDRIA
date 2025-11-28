@@ -12,7 +12,7 @@
 
     <!-- App Header -->
     <header class="app-header">
-      <h1>MIN MIN HELADERIA - POS</h1>
+      <h1>MIN MIN HELADERIA - POS v1</h1>
     </header>
 
     <!-- Main Content Area -->
@@ -32,11 +32,11 @@
         <pos-view v-if="currentView === 'pos'" :table="currentTable" @open-edit="openEditModal"
           @open-payment="goToPaymentView" @back-to-tables="setView('tables')" ref="viewComponent"></pos-view>
 
-        <orders-view v-if="currentView === 'orders'" @view-order="viewOrder"></orders-view>
+        <orders-view v-if="currentView === 'orders'"></orders-view>
 
-        <cashier-view v-if="currentView === 'cashier'" :session="activeSession" :closing-summary="closingSummary"
-          @open-session="handleOpenSession" @close-session="handleCloseSession" @add-income="handleAddIncome"
-          @add-expense="handleAddExpense" @fetch-expected-cash="fetchExpectedCash" ref="cashierView">
+        <cashier-view v-if="currentView === 'cashier'" :session="activeSession" @open-session="handleOpenSession"
+          @close-session="handleCloseSession" @add-income="handleAddIncome" @add-expense="handleAddExpense"
+          ref="cashierView">
         </cashier-view>
 
         <payment-view v-if="currentView === 'payment'" :order="orderToPay" :payment-methods="paymentMethods"
@@ -93,6 +93,9 @@
     <!-- Global Notification Modal -->
     <global-notification ref="notification"></global-notification>
 
+    <!-- Confirmation Modal -->
+    <confirmation-modal ref="confirmationModal"></confirmation-modal>
+
   </div>
 
   <!-- TEMPLATES -->
@@ -118,10 +121,32 @@
     </transition>
   </script>
 
+  <script type="text/x-template" id="confirmation-modal-template">
+    <transition name="fade">
+      <div v-if="visible" class="modal-overlay" @click="cancel">
+        <div class="confirmation-modal" @click.stop>
+          <div class="confirmation-icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <h3>{{ title }}</h3>
+          <p>{{ message }}</p>
+          <div class="confirmation-actions">
+            <button class="btn" @click="cancel">{{ cancelText }}</button>
+            <button class="btn-primary" @click="confirm">{{ confirmText }}</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+  </script>
+
   <script type="text/x-template" id="tables-view-template">
     <div class="tables-grid">
       <div v-for="table in tables" :key="table.table_id" class="table-card"
-           :class="{ 'occupied': table.status === 'Occupied', 'available': table.status === 'Available' }"
+           :class="{ 'occupied': table.status === 'Ocupada', 'available': table.status === 'Disponible' }"
            @click="$emit('select-table', table)">
         <div class="table-name">{{ table.name }}</div>
         <div class="table-status">{{ table.status }}</div>
@@ -130,10 +155,86 @@
   </script>
 
   <script type="text/x-template" id="orders-view-template">
-    <div>
+    <div class="orders-view">
       <h2>Órdenes</h2>
-      <!-- Sub-tab navigation will go here -->
-      <p>Vista de órdenes en construcción.</p>
+      
+      <!-- Tabs Navigation -->
+      <div class="modal-tabs">
+        <button class="tab-btn" :class="{ active: activeTab === 'active' }" 
+                @click="switchTab('active')">
+          Órdenes Activas
+        </button>
+        <button class="tab-btn" :class="{ active: activeTab === 'history' }" 
+                @click="switchTab('history')">
+          Historial
+        </button>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="orders-tab-content">
+        
+        <!-- Active Orders Tab -->
+        <div v-if="activeTab === 'active'" class="active-orders-tab">
+          <div v-if="loading" class="empty-state">Cargando...</div>
+          <div v-else-if="activeOrders.length === 0" class="empty-state">
+            No hay órdenes activas
+          </div>
+          <div v-else class="orders-list">
+            <div v-for="order in activeOrders" :key="order.order_id" 
+                 class="order-card">
+              <div class="order-header">
+                <div class="order-info">
+                  <strong>{{ getTableName(order.table_number) }}</strong>
+                  <span class="order-time">{{ formatTime(order.timestamp) }}</span>
+                </div>
+                <div class="order-total">S/.{{ order.total.toFixed(2) }}</div>
+              </div>
+              <div class="order-items">
+                <div v-for="item in order.items" :key="item.item_id" 
+                     class="order-item-row">
+                  <span class="item-qty">{{ item.quantity }}x</span>
+                  <span class="item-name">{{ item.product_name }}</span>
+                  <span class="item-price">S/.{{ (item.final_price * item.quantity).toFixed(2) }}</span>
+                </div>
+              </div>
+              <div class="order-actions">
+                <button class="btn-primary" @click="goToPayment(order)">
+                  Cobrar Pedido
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Tab -->
+        <div v-if="activeTab === 'history'" class="history-tab">
+          <div v-if="loading" class="empty-state">Cargando...</div>
+          <div v-else-if="paidOrders.length === 0" class="empty-state">
+            No hay historial de órdenes
+          </div>
+          <div v-else class="orders-list">
+            <div v-for="order in paidOrders" :key="order.order_id" 
+                 class="order-card">
+              <div class="order-header">
+                <div class="order-info">
+                  <strong>Orden #{{ order.order_id.substring(4, 10) }}</strong>
+                  <span class="order-time">{{ formatTime(order.timestamp) }}</span>
+                </div>
+                <div class="order-total">S/.{{ order.total_amount.toFixed(2) }}</div>
+              </div>
+              <div class="payment-details">
+                <div class="payment-label">Pagado con:</div>
+                <div v-for="payment in order.payments" :key="payment.payment_id" 
+                     class="payment-row">
+                  <span class="payment-method">{{ payment.payment_method }}</span>
+                  <span class="payment-amount">S/.{{ payment.amount.toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   </script>
 
@@ -152,14 +253,16 @@
       <div v-if="session">
         <!-- Tab Navigation -->
         <div class="modal-tabs">
-          <button class="tab-btn" :class="{ active: activeTab === 'movement' }" @click="switchTab('movement')">Registrar Movimiento</button>
+          <button class="tab-btn" :class="{ active: activeTab === 'movements' }" @click="switchTab('movements')">Movimientos</button>
+          <button class="tab-btn" :class="{ active: activeTab === 'summary' }" @click="switchTab('summary')">Resumen</button>
           <button class="tab-btn" :class="{ active: activeTab === 'close' }" @click="switchTab('close')">Cerrar Caja</button>
         </div>
 
         <!-- Tab Content -->
         <div class="modal-tab-content">
-          <!-- Register Movement Tab -->
-          <div v-if="activeTab === 'movement'">
+          
+          <!-- Movements Tab -->
+          <div v-if="activeTab === 'movements'">
             <h3>Registrar Movimiento de Caja</h3>
             <div class="form-group">
               <label for="cashFlowAmount">Monto</label>
@@ -176,58 +279,133 @@
 
             <hr class="modal-divider">
 
-            <div class="cash-flow-history">
-              <button class="btn-link" @click="toggleMovements">
-                <span v-if="!showMovements">Ver Movimientos de Caja</span>
-                <span v-else>Ocultar Movimientos</span>
-              </button>
-              <div v-if="showMovements && closingSummary" class="movements-list">
-                <div v-if="closingSummary.cashFlowTransactions.length === 0">No hay movimientos en esta sesión.</div>
-                <div v-for="movement in closingSummary.cashFlowTransactions" class="summary-item">
-                  <span>{{ movement.description }}</span>
-                  <span :class="{ 'income': movement.type === 'Ingreso', 'expense': movement.type === 'Salida' }">
+            <div class="cash-flow-section">
+              <div class="section-header">
+                <h4>Movimientos de Esta Sesión</h4>
+                <button class="btn-link" @click="loadMovements" :disabled="movements.loading">
+                  {{ movements.loading ? 'Cargando...' : '🔄 Refrescar' }}
+                </button>
+              </div>
+              
+              <div v-if="movements.loading" class="empty-state">Cargando movimientos...</div>
+              <div v-else-if="movements.list.length === 0" class="empty-state">
+                No hay movimientos en esta sesión.
+              </div>
+              <div v-else class="movements-list">
+                <div v-for="movement in movements.list" :key="movement.transaction_id" class="movement-item">
+                  <span class="movement-desc">{{ movement.description }}</span>
+                  <span :class="['movement-amount', movement.type === 'Ingreso' ? 'income' : 'expense']">
                     {{ movement.type === 'Ingreso' ? '+' : '-' }}S/.{{ movement.amount.toFixed(2) }}
                   </span>
+                </div>
+                <div class="movements-totals">
+                  <div class="total-row">
+                    <span>Total Ingresos:</span>
+                    <span class="income">+S/.{{ movements.totalIncome.toFixed(2) }}</span>
+                  </div>
+                  <div class="total-row">
+                    <span>Total Salidas:</span>
+                    <span class="expense">-S/.{{ movements.totalExpenses.toFixed(2) }}</span>
+                  </div>
+                  <div class="total-row net">
+                    <span>Neto:</span>
+                    <span :class="movements.net >= 0 ? 'income' : 'expense'">
+                      {{ movements.net >= 0 ? '+' : '' }}S/.{{ movements.net.toFixed(2) }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Close Session Tab -->
-          <div v-if="activeTab === 'close'">
-            <h3>Cerrar Sesión de Caja</h3>
-            <div class="closing-summary" v-if="closingSummary">
+          <!-- Summary Tab -->
+          <div v-if="activeTab === 'summary'">
+            <div class="section-header">
+              <h3>Estado Actual de Caja</h3>
+              <button class="btn-link" @click="loadSummary" :disabled="summary.loading">
+                {{ summary.loading ? 'Cargando...' : '🔄 Refrescar' }}
+              </button>
+            </div>
+            
+            <div v-if="summary.loading" class="empty-state">Calculando...</div>
+            <div v-else-if="summary.data" class="closing-summary">
               <div class="summary-item">
                 <span>(+) Monto Inicial:</span>
-                <span>S/.{{ closingSummary.initialAmount.toFixed(2) }}</span>
+                <span>S/.{{ summary.data.initialAmount.toFixed(2) }}</span>
               </div>
-              <div class="summary-item indented" v-for="(amount, method) in closingSummary.paymentMethodTotals">
+              <div class="summary-item indented" v-for="(amount, method) in summary.data.paymentMethodTotals" :key="method">
                 <span>(+) Ventas ({{ method }}):</span>
                 <span>S/.{{ amount.toFixed(2) }}</span>
               </div>
               <div class="summary-item">
                 <span>(+) Otros Ingresos:</span>
-                <span>S/.{{ closingSummary.totalIncome.toFixed(2) }}</span>
+                <span>S/.{{ summary.data.totalIncome.toFixed(2) }}</span>
               </div>
               <div class="summary-item">
                 <span>(-) Salidas / Gastos:</span>
-                <span>-S/.{{ closingSummary.totalExpenses.toFixed(2) }}</span>
+                <span>-S/.{{ summary.data.totalExpenses.toFixed(2) }}</span>
               </div>
               <div class="summary-item total">
                 <span>(=) Efectivo Esperado:</span>
-                <span>S/.{{ closingSummary.expectedCash.toFixed(2) }}</span>
+                <span>S/.{{ summary.data.expectedCash.toFixed(2) }}</span>
+              </div>
+              <div class="info-box">
+                <p>ℹ️ Este es el efectivo que debería haber en caja al momento de cerrar.</p>
               </div>
             </div>
-            <div v-else class="expected-cash-display">Calculando...</div>
+          </div>
+
+          <!-- Close Cash Tab -->
+          <div v-if="activeTab === 'close'">
+            <h3>Cerrar Sesión de Caja</h3>
+            
+            <div v-if="closing.loading" class="empty-state">Calculando...</div>
+            <div v-else-if="closing.summary" class="closing-summary">
+              <h4>Resumen Final</h4>
+              <div class="summary-item">
+                <span>(+) Monto Inicial:</span>
+                <span>S/.{{ closing.summary.initialAmount.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item indented" v-for="(amount, method) in closing.summary.paymentMethodTotals" :key="method">
+                <span>(+) Ventas ({{ method }}):</span>
+                <span>S/.{{ amount.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item">
+                <span>(+) Otros Ingresos:</span>
+                <span>S/.{{ closing.summary.totalIncome.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item">
+                <span>(-) Salidas / Gastos:</span>
+                <span>-S/.{{ closing.summary.totalExpenses.toFixed(2) }}</span>
+              </div>
+              <div class="summary-item total">
+                <span>(=) Efectivo Esperado:</span>
+                <span>S/.{{ closing.summary.expectedCash.toFixed(2) }}</span>
+              </div>
+            </div>
+            
             <hr class="modal-divider">
+            
             <div class="form-group">
               <label for="countedCash">Monto Final Contado en Caja</label>
-              <input type="number" id="countedCash" v-model.number="form.countedCash" placeholder="0.00">
+              <input type="number" id="countedCash" v-model.number="form.countedCash" placeholder="0.00" step="0.01">
             </div>
+            
+            <div v-if="form.countedCash !== null && closing.summary" class="difference-display">
+              <div class="summary-item" :class="{ 'positive': difference >= 0, 'negative': difference < 0 }">
+                <span>Diferencia:</span>
+                <span>{{ difference >= 0 ? '+' : '' }}S/.{{ difference.toFixed(2) }}</span>
+              </div>
+              <p v-if="difference > 0" class="difference-note">✓ Sobrante</p>
+              <p v-else-if="difference < 0" class="difference-note">⚠️ Faltante</p>
+              <p v-else class="difference-note">✓ Cuadre Exacto</p>
+            </div>
+            
             <div class="form-group">
               <label for="notes">Notas de Cierre</label>
-              <textarea id="notes" v-model="form.notes" rows="3"></textarea>
+              <textarea id="notes" v-model="form.notes" rows="3" placeholder="Observaciones opcionales..."></textarea>
             </div>
+            
             <div class="modal-actions">
               <button class="btn-primary" @click="$emit('close-session', form)">Cerrar Caja y Ver Reporte</button>
             </div>

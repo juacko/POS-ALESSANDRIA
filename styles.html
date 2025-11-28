@@ -849,4 +849,350 @@
   .fade-leave-to {
     opacity: 0;
   }
+
+  /* Confirmation Modal Styles */
+  .confirmation-modal {
+    background: var(--bg-white);
+    padding: 2rem;
+    border-radius: 16px;
+    text-align: center;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: modalSlideIn 0.3s ease-out;
+  }
+
+  @keyframes modalSlideIn {
+    from {
+      transform: scale(0.9) translateY(-20px);
+      opacity: 0;
+    }
+
+    to {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .confirmation-icon {
+    margin: 0 auto 1.5rem;
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: iconPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes iconPulse {
+
+    0%,
+    100% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  .confirmation-icon svg {
+    color: #f59e0b;
+    filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.3));
+  }
+
+  .confirmation-modal h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  .confirmation-modal p {
+    margin: 0 0 2rem 0;
+    color: var(--text-light);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .confirmation-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .confirmation-actions .btn,
+  .confirmation-actions .btn-primary {
+    min-width: 120px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+  }
+
+  .confirmation-actions .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .confirmation-actions .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  }
+
+  /* Orders View Styles */
+  .orders-view {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .orders-tab-content {
+    margin-top: 24px;
+  }
+
+  .orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .order-card {
+    background-color: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    transition: box-shadow 0.2s;
+  }
+
+  .order-card:hover {
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+
+  .order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .order-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .order-time {
+    font-size: 0.85em;
+    color: var(--text-light);
+  }
+
+  .order-total {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--primary);
+  }
+
+  .order-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .order-item-row {
+    display: flex;
+    gap: 8px;
+    font-size: 0.9em;
+  }
+
+  .item-qty {
+    font-weight: 600;
+    min-width: 30px;
+    color: var(--text-light);
+  }
+
+  .item-name {
+    flex-grow: 1;
+  }
+
+  .item-price {
+    font-weight: 500;
+  }
+
+  .order-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .payment-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .payment-label {
+    font-size: 0.85em;
+    color: var(--text-light);
+    margin-bottom: 4px;
+  }
+
+  .payment-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 0.9em;
+  }
+
+  .payment-method {
+    color: var(--text-dark);
+    font-weight: 500;
+  }
+
+  .payment-amount {
+    font-weight: 600;
+    color: var(--primary);
+  }
+
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-light);
+    font-size: 1.1em;
+  }
+
+  /* Cashier Module Styles */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .section-header h3,
+  .section-header h4 {
+    margin: 0;
+  }
+
+  .cash-flow-section {
+    margin-top: 24px;
+  }
+
+  .movements-list {
+    background-color: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .movement-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .movement-item:last-child {
+    border-bottom: none;
+  }
+
+  .movement-desc {
+    flex-grow: 1;
+    color: var(--text-dark);
+  }
+
+  .movement-amount {
+    font-weight: 600;
+    min-width: 100px;
+    text-align: right;
+  }
+
+  .movement-amount.income {
+    color: var(--success);
+  }
+
+  .movement-amount.expense {
+    color: var(--danger);
+  }
+
+  .movements-totals {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 2px solid var(--border);
+  }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-weight: 500;
+  }
+
+  .total-row.net {
+    font-size: 1.1em;
+    font-weight: 600;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .total-row .income {
+    color: var(--success);
+  }
+
+  .total-row .expense {
+    color: var(--danger);
+  }
+
+  .info-box {
+    background-color: #e3f2fd;
+    border-left: 4px solid var(--primary);
+    padding: 12px 16px;
+    margin-top: 16px;
+    border-radius: 4px;
+  }
+
+  .info-box p {
+    margin: 0;
+    color: var(--text-dark);
+    font-size: 0.9em;
+  }
+
+  .difference-display {
+    background-color: var(--bg-main);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+  }
+
+  .difference-display .summary-item {
+    font-size: 1.1em;
+    font-weight: 600;
+  }
+
+  .difference-display .summary-item.positive span:last-child {
+    color: var(--success);
+  }
+
+  .difference-display .summary-item.negative span:last-child {
+    color: var(--danger);
+  }
+
+  .difference-note {
+    margin: 8px 0 0 0;
+    font-size: 0.9em;
+    font-weight: 500;
+  }
+
+  .btn-link:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 </style>

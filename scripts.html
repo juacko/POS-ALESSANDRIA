@@ -31,58 +31,297 @@
         }
     };
 
+    const ConfirmationModal = {
+        template: '#confirmation-modal-template',
+        data() {
+            return {
+                visible: false,
+                title: '',
+                message: '',
+                confirmText: 'Confirmar',
+                cancelText: 'Cancelar',
+                onConfirm: null,
+                onCancel: null
+            };
+        },
+        methods: {
+            show(options) {
+                this.title = options.title || '¿Estás seguro?';
+                this.message = options.message || '';
+                this.confirmText = options.confirmText || 'Confirmar';
+                this.cancelText = options.cancelText || 'Cancelar';
+                this.onConfirm = options.onConfirm || null;
+                this.onCancel = options.onCancel || null;
+                this.visible = true;
+            },
+            confirm() {
+                this.visible = false;
+                if (this.onConfirm) this.onConfirm();
+            },
+            cancel() {
+                this.visible = false;
+                if (this.onCancel) this.onCancel();
+            }
+        }
+    };
+
     const TablesView = {
         template: '#tables-view-template',
         props: ['tables']
     };
 
+
     const OrdersView = {
         template: '#orders-view-template',
-        methods: {
-            viewOrder(orderId) {
-                this.$root.showNotification('Vista de orden en construcción.', 'info', 'Información');
+        data() {
+            return {
+                activeTab: 'active',
+                activeOrders: [],
+                paidOrders: [],
+                loading: false
+            };
+        },
+        computed: {
+            tables() {
+                return this.$root.tables;
             }
+        },
+        methods: {
+            switchTab(tab) {
+                this.activeTab = tab;
+                if (tab === 'active' && this.activeOrders.length === 0) {
+                    this.loadActiveOrders();
+                } else if (tab === 'history' && this.paidOrders.length === 0) {
+                    this.loadPaidOrders();
+                }
+            },
+            loadActiveOrders() {
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.activeOrders = res.orders;
+                        } else {
+                            this.$root.showNotification('Error cargando órdenes: ' + res.error, 'error');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        this.loading = false;
+                        this.$root.showNotification('Error de conexión: ' + err.message, 'error');
+                    })
+                    .getActiveOrdersData();
+            },
+            loadPaidOrders() {
+                this.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        this.loading = false;
+                        if (res.success) {
+                            this.paidOrders = res.orders;
+                        } else {
+                            this.$root.showNotification('Error cargando historial: ' + res.error, 'error');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        this.loading = false;
+                        this.$root.showNotification('Error de conexión: ' + err.message, 'error');
+                    })
+                    .getPaidOrdersHistory();
+            },
+            getTableName(tableId) {
+                const table = this.tables.find(t => t.table_id === tableId);
+                return table ? table.name : tableId;
+            },
+            formatTime(timestamp) {
+                if (!timestamp) return '';
+                const date = new Date(timestamp);
+                return date.toLocaleTimeString('es-PE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            },
+            goToPayment(order) {
+                // Preparar datos de la orden para el pago
+                const orderData = {
+                    cart: order.items,
+                    cartTotal: order.total
+                };
+                // Establecer la orden actual y el ID
+                this.$root.currentOrderId = order.order_id;
+                this.$root.currentTable = { table_id: order.table_number };
+                // Navegar a la vista de pago
+                this.$root.goToPaymentView(orderData);
+            }
+        },
+        mounted() {
+            // Cargar órdenes activas por defecto (caché en memoria)
+            this.loadActiveOrders();
         }
     };
 
     const CashierView = {
         template: '#cashier-view-template',
-        props: ['session', 'closingSummary', 'cashFlowMovements'],
+        props: ['session'],
         data() {
             return {
                 form: {
-                    initialAmount: null, countedCash: null, notes: '',
-                    cashFlowAmount: null, cashFlowDescription: ''
+                    initialAmount: null,
+                    countedCash: null,
+                    notes: '',
+                    cashFlowAmount: null,
+                    cashFlowDescription: ''
                 },
-                activeTab: 'movement',
-                showMovements: false
+                activeTab: 'movements',
+                // Separate state for each tab
+                movements: {
+                    list: [],
+                    loading: false,
+                    totalIncome: 0,
+                    totalExpenses: 0,
+                    net: 0
+                },
+                summary: {
+                    data: null,
+                    loading: false
+                },
+                closing: {
+                    summary: null,
+                    loading: false
+                }
             };
+        },
+        computed: {
+            difference() {
+                if (this.form.countedCash === null || !this.closing.summary) return 0;
+                return this.form.countedCash - this.closing.summary.expectedCash;
+            }
         },
         methods: {
             switchTab(tabName) {
                 this.activeTab = tabName;
-                if (tabName === 'close') {
-                    this.$emit('fetch-expected-cash');
+                if (tabName === 'movements') {
+                    this.loadMovements();
+                } else if (tabName === 'summary') {
+                    this.loadSummary();
+                } else if (tabName === 'close') {
+                    this.loadClosingSummary();
                 }
             },
-            toggleMovements() {
-                this.showMovements = !this.showMovements;
-                if (this.showMovements) {
-                    this.$emit('fetch-movements');
-                }
+            loadMovements() {
+                console.log('loadMovements: Starting...');
+                this.movements.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        console.log('loadMovements: Response received', res);
+                        this.movements.loading = false;
+
+                        // Handle null response
+                        if (res === null) {
+                            console.error('loadMovements: Received null response - function may not exist in Apps Script');
+                            this.$root.showNotification('Error: La función getExpectedCash() no está disponible. Verifica que el código esté desplegado correctamente.', 'error');
+                            return;
+                        }
+
+                        if (res.success) {
+                            console.log('loadMovements: Success, cashFlowTransactions:', res.summary.cashFlowTransactions);
+                            this.movements.list = res.summary.cashFlowTransactions || [];
+                            this.movements.totalIncome = res.summary.totalIncome || 0;
+                            this.movements.totalExpenses = res.summary.totalExpenses || 0;
+                            this.movements.net = this.movements.totalIncome - this.movements.totalExpenses;
+                            console.log('loadMovements: Movements loaded:', this.movements.list.length);
+                        } else {
+                            console.error('loadMovements: Error in response:', res.error);
+                            this.$root.showNotification('Error cargando movimientos: ' + res.error, 'error');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        console.error('loadMovements: Failure handler called:', err);
+                        this.movements.loading = false;
+                        this.$root.showNotification('Error de conexión: ' + err.message, 'error');
+                    })
+                    .getExpectedCash();
+            },
+            loadSummary() {
+                console.log('loadSummary: Starting...');
+                this.summary.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        console.log('loadSummary: Response received', res);
+                        this.summary.loading = false;
+
+                        if (res === null) {
+                            console.error('loadSummary: Received null response');
+                            this.$root.showNotification('Error: La función getExpectedCash() no está disponible.', 'error');
+                            return;
+                        }
+
+                        if (res.success) {
+                            this.summary.data = res.summary;
+                            console.log('loadSummary: Summary loaded');
+                        } else {
+                            console.error('loadSummary: Error in response:', res.error);
+                            this.$root.showNotification('Error cargando resumen: ' + res.error, 'error');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        console.error('loadSummary: Failure handler called:', err);
+                        this.summary.loading = false;
+                        this.$root.showNotification('Error de conexión: ' + err.message, 'error');
+                    })
+                    .getExpectedCash();
+            },
+            loadClosingSummary() {
+                console.log('loadClosingSummary: Starting...');
+                this.closing.loading = true;
+                google.script.run
+                    .withSuccessHandler(res => {
+                        console.log('loadClosingSummary: Response received', res);
+                        this.closing.loading = false;
+
+                        if (res === null) {
+                            console.error('loadClosingSummary: Received null response');
+                            this.$root.showNotification('Error: La función getExpectedCash() no está disponible.', 'error');
+                            return;
+                        }
+
+                        if (res.success) {
+                            this.closing.summary = res.summary;
+                            console.log('loadClosingSummary: Summary loaded');
+                        } else {
+                            console.error('loadClosingSummary: Error in response:', res.error);
+                            this.$root.showNotification('Error calculando resumen: ' + res.error, 'error');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        console.error('loadClosingSummary: Failure handler called:', err);
+                        this.closing.loading = false;
+                        this.$root.showNotification('Error de conexión: ' + err.message, 'error');
+                    })
+                    .getExpectedCash();
             }
         },
         watch: {
             session(newSession) {
                 if (newSession) {
-                    this.activeTab = 'movement';
+                    this.activeTab = 'movements';
                     this.form.initialAmount = null;
                     this.form.cashFlowAmount = null;
                     this.form.cashFlowDescription = '';
                     this.form.countedCash = null;
                     this.form.notes = '';
-                    this.showMovements = false; // Reset on new session
+                    // Reset all tab states
+                    this.movements = { list: [], loading: false, totalIncome: 0, totalExpenses: 0, net: 0 };
+                    this.summary = { data: null, loading: false };
+                    this.closing = { summary: null, loading: false };
+                    // Load initial data
+                    this.loadMovements();
                 }
+            }
+        },
+        mounted() {
+            if (this.session) {
+                this.loadMovements();
             }
         }
     };
@@ -243,20 +482,26 @@
                     this.$root.showNotification('Esta mesa tiene un pedido activo. Por favor, cóbralo o vacía el carrito para poder liberarla.', 'error', 'Acción no permitida');
                     return;
                 }
-                if (confirm('¿Estás seguro de que quieres liberar esta mesa? Se eliminará la orden vacía.')) {
-                    this.root.loading = true;
-                    google.script.run
-                        .withSuccessHandler(res => {
-                            this.root.loading = false;
-                            if (res.success) {
-                                this.$root.showNotification('Mesa liberada.', 'success');
-                                this.root.setView('tables');
-                            } else {
-                                this.$root.showNotification('Error al liberar la mesa: ' + res.error, 'error');
-                            }
-                        })
-                        .forceFreeUpTable(this.table.table_id, this.root.currentOrderId);
-                }
+                this.$root.$refs.confirmationModal.show({
+                    title: 'Liberar Mesa',
+                    message: '¿Estás seguro de que quieres liberar esta mesa? Se eliminará la orden vacía.',
+                    confirmText: 'Sí, liberar',
+                    cancelText: 'Cancelar',
+                    onConfirm: () => {
+                        this.root.loading = true;
+                        google.script.run
+                            .withSuccessHandler(res => {
+                                this.root.loading = false;
+                                if (res.success) {
+                                    this.$root.showNotification('Mesa liberada.', 'success');
+                                    this.root.setView('tables');
+                                } else {
+                                    this.$root.showNotification('Error al liberar la mesa: ' + res.error, 'error');
+                                }
+                            })
+                            .forceFreeUpTable(this.table.table_id, this.root.currentOrderId);
+                    }
+                });
             }
         },
         mounted() {
@@ -335,7 +580,8 @@
             'cashier-view': CashierView,
             'edit-item-modal': EditItemModal,
             'payment-view': PaymentView,
-            'global-notification': GlobalNotification
+            'global-notification': GlobalNotification,
+            'confirmation-modal': ConfirmationModal
         },
         data: {
             loading: true, currentView: 'tables',
@@ -491,7 +737,10 @@
                             this.showNotification('Movimiento registrado exitosamente.', 'success');
                             form.cashFlowAmount = null;
                             form.cashFlowDescription = '';
-                            this.fetchExpectedCash();
+                            // Reload movements in cashier component
+                            if (this.$refs.cashierView) {
+                                this.$refs.cashierView.loadMovements();
+                            }
                         } else {
                             this.showNotification('Error registrando movimiento: ' + res.error, 'error');
                         }
