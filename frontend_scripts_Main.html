@@ -130,22 +130,34 @@
         data() {
             return {
                 activeTab: 'active',
-                activeOrders: [],
-                paidOrders: [],
                 loading: false
             };
         },
         computed: {
             tables() {
                 return this.$root.tables;
+            },
+            activeOrders() {
+                return this.$root.orders.active;
+            },
+            paidOrders() {
+                return this.$root.orders.history;
             }
         },
         methods: {
             switchTab(tab) {
                 this.activeTab = tab;
+                // Only load if empty, otherwise use cache
                 if (tab === 'active' && this.activeOrders.length === 0) {
                     this.loadActiveOrders();
                 } else if (tab === 'history' && this.paidOrders.length === 0) {
+                    this.loadPaidOrders();
+                }
+            },
+            refreshData() {
+                if (this.activeTab === 'active') {
+                    this.loadActiveOrders();
+                } else {
                     this.loadPaidOrders();
                 }
             },
@@ -155,7 +167,7 @@
                     .withSuccessHandler(res => {
                         this.loading = false;
                         if (res.success) {
-                            this.activeOrders = res.orders;
+                            this.$root.orders.active = res.orders;
                         } else {
                             this.$root.showNotification('Error cargando órdenes: ' + res.error, 'error');
                         }
@@ -172,7 +184,7 @@
                     .withSuccessHandler(res => {
                         this.loading = false;
                         if (res.success) {
-                            this.paidOrders = res.orders;
+                            this.$root.orders.history = res.orders;
                         } else {
                             this.$root.showNotification('Error cargando historial: ' + res.error, 'error');
                         }
@@ -209,8 +221,10 @@
             }
         },
         mounted() {
-            // Cargar órdenes activas por defecto (caché en memoria)
-            this.loadActiveOrders();
+            // Load only if we don't have data yet
+            if (this.activeOrders.length === 0) {
+                this.loadActiveOrders();
+            }
         }
     };
 
@@ -662,7 +676,12 @@
             editingItem: null,
             editingItemIndex: -1,
             closingSummary: null,
-            orderToPay: null
+            orderToPay: null,
+            // Global orders state for persistence
+            orders: {
+                active: [],
+                history: []
+            }
         },
         methods: {
             showNotification(message, type, title) {
@@ -674,22 +693,11 @@
 
                 // Show welcome notification with profile icon
                 const welcomeMessage = `¡Bienvenido/a, ${user.full_name}!`;
-                this.$refs.notification.show('Inicio de Sesión Exitoso', welcomeMessage, 'success');
+                this.$refs.notification.show(welcomeMessage, 'success', 'Inicio de Sesión Exitoso');
 
-                // Check if there's an active cashier session
-                if (this.activeSession) {
-                    this.loadData();
-                    this.setView('tables');
-                } else {
-                    this.$refs.notification.show(
-                        'Atención',
-                        'No hay una sesión de caja activa. Puedes abrir una desde el módulo de Caja.',
-                        'info'
-                    );
-                    // Still allow access to tables view
-                    this.loadData();
-                    this.setView('tables');
-                }
+                // Load data and go to tables
+                this.loadData();
+                this.setView('tables');
             },
             handleLogout() {
                 this.currentUser = null;

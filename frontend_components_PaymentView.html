@@ -1,7 +1,6 @@
 <script type="text/x-template" id="payment-view-template-v2">
     <div class="payment-view">
       <div class="payment-header">
-        <button class="btn" @click="$emit('back')">&larr; Volver a la Orden</button>
         <h3>Procesar Pago</h3>
       </div>
       
@@ -45,11 +44,16 @@
         </div>
       </div>
       
-      <button class="btn-link" @click="addPaymentLine">+ Agregar otro método de pago</button>
+      <button class="btn-add-method" @click="addPaymentLine">
+        <i class="fas fa-plus-circle"></i> Agregar otro método de pago
+      </button>
 
       <div class="payment-view-footer">
         <button class="btn-primary btn-full" :disabled="remainingBalance > 0.01" @click="submit">
           Confirmar Pago de S/.{{ totalPaid.toFixed(2) }}
+        </button>
+        <button class="btn-back-link" @click="$emit('back')">
+          &larr; Volver a la Orden
         </button>
       </div>
     </div>

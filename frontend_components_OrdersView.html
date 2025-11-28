@@ -1,6 +1,11 @@
-  <script type="text/x-template" id="orders-view-template">
+<script type="text/x-template" id="orders-view-template">
     <div class="orders-view">
-      <h2>Órdenes</h2>
+      <div class="section-header">
+        <h2>Órdenes</h2>
+        <button class="btn-refresh" @click="refreshData" :disabled="loading">
+          {{ loading ? 'Cargando...' : 'Refrescar' }}
+        </button>
+      </div>
       
       <!-- Tabs Navigation -->
       <div class="modal-tabs">
@@ -23,27 +28,31 @@
           <div v-else-if="activeOrders.length === 0" class="empty-state">
             No hay órdenes activas
           </div>
-          <div v-else class="orders-list">
+          <div v-else class="orders-grid">
             <div v-for="order in activeOrders" :key="order.order_id" 
-                 class="order-card">
+                 class="order-card active-order">
               <div class="order-header">
                 <div class="order-info">
-                  <strong>{{ getTableName(order.table_number) }}</strong>
-                  <span class="order-time">{{ formatTime(order.timestamp) }}</span>
+                  <div class="table-badge">
+                    <i class="fas fa-chair"></i> {{ getTableName(order.table_number) }}
+                  </div>
+                  <span class="order-time"><i class="far fa-clock"></i> {{ formatTime(order.timestamp) }}</span>
                 </div>
-                <div class="order-total">S/.{{ order.total.toFixed(2) }}</div>
               </div>
-              <div class="order-items">
-                <div v-for="item in order.items" :key="item.item_id" 
+              
+              <div class="order-items-preview">
+                <div v-for="(item, index) in order.items" :key="item.item_id" 
                      class="order-item-row">
                   <span class="item-qty">{{ item.quantity }}x</span>
                   <span class="item-name">{{ item.product_name }}</span>
-                  <span class="item-price">S/.{{ (item.final_price * item.quantity).toFixed(2) }}</span>
                 </div>
               </div>
-              <div class="order-actions">
-                <button class="btn-primary" @click="goToPayment(order)">
-                  Cobrar Pedido
+
+              <div class="order-footer">
+                <div class="order-total-label">Total</div>
+                <div class="order-total">S/.{{ order.total.toFixed(2) }}</div>
+                <button class="btn-primary btn-full" @click="goToPayment(order)">
+                  Cobrar
                 </button>
               </div>
             </div>
@@ -56,23 +65,27 @@
           <div v-else-if="paidOrders.length === 0" class="empty-state">
             No hay historial de órdenes
           </div>
-          <div v-else class="orders-list">
+          <div v-else class="orders-grid">
             <div v-for="order in paidOrders" :key="order.order_id" 
-                 class="order-card">
+                 class="order-card history-order">
               <div class="order-header">
                 <div class="order-info">
-                  <strong>Orden #{{ order.order_id.substring(4, 10) }}</strong>
+                  <div class="order-id-badge">#{{ order.order_id.substring(4, 10) }}</div>
                   <span class="order-time">{{ formatTime(order.timestamp) }}</span>
                 </div>
-                <div class="order-total">S/.{{ order.total_amount.toFixed(2) }}</div>
+                <div class="status-badge paid">Pagado</div>
               </div>
-              <div class="payment-details">
-                <div class="payment-label">Pagado con:</div>
-                <div v-for="payment in order.payments" :key="payment.payment_id" 
-                     class="payment-row">
-                  <span class="payment-method">{{ payment.payment_method }}</span>
-                  <span class="payment-amount">S/.{{ payment.amount.toFixed(2) }}</span>
+              
+              <div class="payment-summary">
+                <div class="payment-row" v-for="payment in order.payments" :key="payment.payment_id">
+                  <span>{{ payment.payment_method }}</span>
+                  <strong>S/.{{ payment.amount.toFixed(2) }}</strong>
                 </div>
+              </div>
+
+              <div class="order-footer">
+                <div class="order-total-label">Total Pagado</div>
+                <div class="order-total">S/.{{ order.total_amount.toFixed(2) }}</div>
               </div>
             </div>
           </div>

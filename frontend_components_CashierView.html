@@ -42,8 +42,8 @@
             <div class="cash-flow-section">
               <div class="section-header">
                 <h4>Movimientos de Esta Sesión</h4>
-                <button class="btn-link" @click="loadMovements" :disabled="movements.loading">
-                  {{ movements.loading ? 'Cargando...' : '🔄 Refrescar' }}
+                <button class="btn-refresh" @click="loadMovements" :disabled="movements.loading">
+                  {{ movements.loading ? 'Cargando...' : 'Refrescar' }}
                 </button>
               </div>
               
@@ -82,8 +82,8 @@
           <div v-if="activeTab === 'summary'">
             <div class="section-header">
               <h3>Estado Actual de Caja</h3>
-              <button class="btn-link" @click="loadSummary" :disabled="summary.loading">
-                {{ summary.loading ? 'Cargando...' : '🔄 Refrescar' }}
+              <button class="btn-refresh" @click="loadSummary" :disabled="summary.loading">
+                {{ summary.loading ? 'Cargando...' : 'Refrescar' }}
               </button>
             </div>
             
